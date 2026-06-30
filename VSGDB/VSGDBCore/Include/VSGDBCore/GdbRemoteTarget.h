@@ -99,6 +99,14 @@ namespace VSGDBCore
             const std::string& Name);
 
     private:
+        DebugError SetQemuPhysicalMemoryMode(
+            bool Enabled);
+
+        Result<ByteVector> ReadMemoryUsingGdbM(
+            U64 Address,
+            U32 Size);
+
+    private:
         GdbRemoteConnection Connection;
         DebugTargetConfig Config{};
 

@@ -93,6 +93,9 @@
     <ClInclude Include="Source\Gdb\GdbTargetDescription.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Include\VSGDBCore\X64Paging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Core\DebugSession.cpp">
@@ -129,6 +132,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Gdb\GdbTargetDescription.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Paging\X64Paging.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

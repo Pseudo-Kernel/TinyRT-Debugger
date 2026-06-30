@@ -2,6 +2,7 @@
 #include <cstdlib>
 
 #include <VSGDBCore/GdbRemoteTarget.h>
+#include <VSGDBCore/X64Paging.h>
 
 static void PrintRegister(const char* Name, VSGDBCore::U64 Value)
 {
@@ -47,6 +48,86 @@ static void PrintRegisters(const VSGDBCore::RegisterContext& Context)
     PrintRegister("EFER", Context.Efer);
 }
 
+static const char*
+PagingLevelName(
+    VSGDBCore::X64PagingLevel Level)
+{
+    switch (Level)
+    {
+    case VSGDBCore::X64PagingLevel::Pml4:
+        return "PML4";
+    case VSGDBCore::X64PagingLevel::Pdpt:
+        return "PDPT";
+    case VSGDBCore::X64PagingLevel::Pd:
+        return "PD  ";
+    case VSGDBCore::X64PagingLevel::Pt:
+        return "PT  ";
+    default:
+        return "????";
+    }
+}
+
+static void
+PrintPageEntry(
+    const VSGDBCore::X64PageEntry& Entry)
+{
+    std::printf(
+        "%s @ 0x%016llx = 0x%016llx  %c %c%c %c NX=%u LP=%u\n",
+        PagingLevelName(Entry.Level),
+        Entry.EntryPhysicalAddress,
+        Entry.Value,
+        Entry.Present ? 'P' : '-',
+        Entry.Write ? 'W' : 'R',
+        Entry.User ? 'U' : 'S',
+        Entry.Global ? 'G' : '-',
+        Entry.NoExecute ? 1 : 0,
+        Entry.LargePage ? 1 : 0);
+}
+
+static void
+PrintTranslation(
+    const VSGDBCore::X64AddressTranslationResult& Translation)
+{
+    std::printf(
+        "VA  = 0x%016llx\n",
+        Translation.VirtualAddress);
+
+    std::printf(
+        "CR3 = 0x%016llx\n",
+        Translation.Cr3);
+
+    std::printf(
+        "IDX = PML4[%03x] PDPT[%03x] PD[%03x] PT[%03x] OFF[%03x]\n",
+        Translation.Parts.Pml4Index,
+        Translation.Parts.PdptIndex,
+        Translation.Parts.PdIndex,
+        Translation.Parts.PtIndex,
+        Translation.Parts.PageOffset);
+
+    for (const auto& Entry : Translation.Entries)
+    {
+        PrintPageEntry(Entry);
+    }
+
+    if (Translation.Success)
+    {
+        std::printf(
+            "PA  = 0x%016llx\n",
+            Translation.PhysicalAddress);
+
+        std::printf(
+            "PageSize = 0x%llx\n",
+            Translation.PageSize);
+    }
+    else
+    {
+        std::wprintf(
+            L"Translation failed: %s\n",
+            Translation.FailureMessage.c_str());
+    }
+}
+
+
 int main(int ArgumentCount, char** Arguments)
 {
     VSGDBCore::U16 Port = 1234;
@@ -83,9 +164,7 @@ int main(int ArgumentCount, char** Arguments)
         std::printf("Current thread: %s\n", Event.Value.RemoteThreadId.c_str());
     }
 
-    Target.SelectRegisterThreadForTest("p01.02");
-
-    auto Registers = Target.GetRegisters(0);
+    auto Registers = Target.GetRegisters(2);
     if (!Registers.Succeeded())
     {
         std::wprintf(
@@ -293,6 +372,94 @@ int main(int ArgumentCount, char** Arguments)
             PrintRegisters(RegistersPerCpu.Value);
         }
     }
+
+    auto PhysicalBytes = Target.ReadPhysicalMemory(
+        Registers.Value.Cr3 & 0x000ffffffffff000ull,
+        16);
+
+    if (!PhysicalBytes.Succeeded())
+    {
+        std::wprintf(
+            L"ReadPhysicalMemory failed: %s Code=%d Native=0x%08x\n",
+            PhysicalBytes.Error.Message.c_str(),
+            static_cast<int>(PhysicalBytes.Error.Code),
+            PhysicalBytes.Error.NativeCode);
+
+        return 1;
+    }
+
+    std::printf("Physical bytes at CR3:");
+    for (VSGDBCore::U8 Byte : PhysicalBytes.Value)
+    {
+        std::printf(" %02x", Byte);
+    }
+    std::printf("\n");
+
+    {
+        VSGDBCore::X64PagingContext Paging{};
+        Paging.Cr0 = Registers.Value.Cr0;
+        Paging.Cr3 = Registers.Value.Cr3;
+        Paging.Cr4 = Registers.Value.Cr4;
+        Paging.Efer = Registers.Value.Efer;
+
+        auto Translation = VSGDBCore::TranslateX64VirtualAddress(
+            Target,
+            Paging,
+            Registers.Value.Rip);
+
+        if (!Translation.Succeeded())
+        {
+            std::wprintf(
+                L"Translate failed: %s\n",
+                Translation.Error.Message.c_str());
+            return 1;
+        }
+
+        PrintTranslation(Translation.Value);
+
+        auto PhysicalBytes = Target.ReadPhysicalMemory(
+            Translation.Value.PhysicalAddress,
+            16);
+
+        if (!PhysicalBytes.Succeeded())
+        {
+            std::wprintf(
+                L"ReadPhysicalMemory failed: %s\n",
+                PhysicalBytes.Error.Message.c_str());
+            return 1;
+        }
+
+        auto VirtualBytes = Target.ReadVirtualMemory(
+            2,
+            Registers.Value.Rip,
+            16);
+
+        if (!VirtualBytes.Succeeded())
+        {
+            std::wprintf(
+                L"ReadPhysicalMemory failed: %s\n",
+                VirtualBytes.Error.Message.c_str());
+            return 1;
+        }
+
+        if (PhysicalBytes.Value.size() != VirtualBytes.Value.size())
+        {
+            std::printf("Physical/Virtual read mismatch\n");
+            return 1;
+        }
+
+        if (memcmp(
+            PhysicalBytes.Value.data(),
+            VirtualBytes.Value.data(),
+            PhysicalBytes.Value.size()))
+        {
+            std::printf("Physical/Virtual read mismatch\n");
+            return 1;
+        }
+
+        std::printf("Physical/Virtual read matched\n");
+    }
+
 
     return 0;
 }

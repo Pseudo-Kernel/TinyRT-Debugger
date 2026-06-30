@@ -338,35 +338,9 @@ namespace VSGDBCore
             return Result<ByteVector>::Failure(SelectError);
         }
 
-        if (Size == 0)
-        {
-            return Result<ByteVector>::Success(ByteVector{});
-        }
-
-        char Command[64]{};
-
-        sprintf_s(
-            Command,
-            "m%llx,%x",
+        return ReadMemoryUsingGdbM(
             Address,
             Size);
-
-        auto Reply = Connection.SendCommand(Command);
-
-        if (!Reply.Succeeded())
-        {
-            return Result<ByteVector>::Failure(Reply.Error);
-        }
-
-        if (!Reply.Value.empty() && Reply.Value[0] == 'E')
-        {
-            return Result<ByteVector>::Failure(
-                DebugError::Failure(
-                    ErrorCode::BackendFailure,
-                    L"GDB remote target failed to read memory."));
-        }
-
-        return DecodeHexBytes(Reply.Value);
     }
 
     DebugError
@@ -417,13 +391,29 @@ namespace VSGDBCore
             U64 Address,
             U32 Size)
     {
-        (void)Address;
-        (void)Size;
+        if (Size == 0)
+        {
+            return Result<ByteVector>::Success(ByteVector{});
+        }
 
-        return Result<ByteVector>::Failure(
-            DebugError::Failure(
-                ErrorCode::NotSupported,
-                L"ReadPhysicalMemory is not implemented yet."));
+        DebugError EnableError = SetQemuPhysicalMemoryMode(true);
+        if (!EnableError.Succeeded())
+        {
+            return Result<ByteVector>::Failure(EnableError);
+        }
+
+        auto Bytes = ReadMemoryUsingGdbM(
+            Address,
+            Size);
+
+        DebugError DisableError = SetQemuPhysicalMemoryMode(false);
+
+        if (!DisableError.Succeeded() && Bytes.Succeeded())
+        {
+            return Result<ByteVector>::Failure(DisableError);
+        }
+
+        return Bytes;
     }
 
     DebugError
@@ -813,17 +803,6 @@ namespace VSGDBCore
             return Result<U64>::Failure(DescriptionError);
         }
 
-#if 0 // for test
-        for (const auto& Register : RegisterDescriptors.Registers)
-        {
-            printf(
-                "GDB register %-16s regnum=%u bits=%u\n",
-                Register.Name.c_str(),
-                Register.Number,
-                Register.BitSize);
-        }
-#endif
-
         const RegisterDescriptor* Descriptor =
             FindRegisterDescriptor(RegisterDescriptors, Name);
 
@@ -1029,5 +1008,75 @@ namespace VSGDBCore
         return DebugError::Success();
     }
 
+    DebugError
+        GdbRemoteTarget::SetQemuPhysicalMemoryMode(
+            bool Enabled)
+    {
+        auto Reply = Connection.SendCommand(
+            Enabled ? "Qqemu.PhyMemMode:1" : "Qqemu.PhyMemMode:0");
 
+        if (!Reply.Succeeded())
+        {
+            return Reply.Error;
+        }
+
+        if (Reply.Value == "OK")
+        {
+            return DebugError::Success();
+        }
+
+        if (Reply.Value.empty())
+        {
+            return DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"GDB remote target does not support physical memory mode.");
+        }
+
+        if (!Reply.Value.empty() && Reply.Value[0] == 'E')
+        {
+            return DebugError::Failure(
+                ErrorCode::BackendFailure,
+                L"GDB remote target rejected physical memory mode.");
+        }
+
+        return DebugError::Failure(
+            ErrorCode::BackendFailure,
+            L"Unexpected reply to physical memory mode command.");
+    }
+
+    Result<ByteVector>
+        GdbRemoteTarget::ReadMemoryUsingGdbM(
+            U64 Address,
+            U32 Size)
+    {
+        if (Size == 0)
+        {
+            return Result<ByteVector>::Success(ByteVector{});
+        }
+
+        char Command[64]{};
+
+        sprintf_s(
+            Command,
+            "m%llx,%x",
+            Address,
+            Size);
+
+        auto Reply = Connection.SendCommand(Command);
+
+        if (!Reply.Succeeded())
+        {
+            return Result<ByteVector>::Failure(Reply.Error);
+        }
+
+        if (!Reply.Value.empty() && Reply.Value[0] == 'E')
+        {
+            return Result<ByteVector>::Failure(
+                DebugError::Failure(
+                    ErrorCode::BackendFailure,
+                    L"GDB remote target failed to read memory."));
+        }
+
+        return DecodeHexBytes(Reply.Value);
+    }
 }
