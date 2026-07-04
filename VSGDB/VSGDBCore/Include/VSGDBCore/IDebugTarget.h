@@ -73,10 +73,10 @@ namespace VSGDBCore
                 L"StepOut is not implemented.");
         }
 
-        virtual Result<DebugEvent> WaitForEvent(
+        virtual Expected<DebugEvent> WaitForEvent(
             U32 TimeoutMilliseconds) = 0;
 
-        virtual Result<RegisterContext> GetRegisters(
+        virtual Expected<RegisterContext> GetRegisters(
             U32 CpuId) = 0;
 
         virtual DebugError SetRegister(
@@ -84,7 +84,7 @@ namespace VSGDBCore
             const std::wstring& Name,
             U64 Value) = 0;
 
-        virtual Result<ByteVector> ReadVirtualMemory(
+        virtual Expected<ByteVector> ReadVirtualMemory(
             U32 CpuId,
             U64 Address,
             U32 Size) = 0;
@@ -94,7 +94,7 @@ namespace VSGDBCore
             U64 Address,
             const ByteVector& Bytes) = 0;
 
-        virtual Result<ByteVector> ReadPhysicalMemory(
+        virtual Expected<ByteVector> ReadPhysicalMemory(
             U64 Address,
             U32 Size) = 0;
 
@@ -102,7 +102,7 @@ namespace VSGDBCore
             U64 Address,
             const ByteVector& Bytes) = 0;
 
-        virtual Result<BreakpointId> SetBreakpoint(
+        virtual Expected<BreakpointId> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) = 0;
@@ -110,6 +110,6 @@ namespace VSGDBCore
         virtual DebugError DeleteBreakpoint(
             BreakpointId Id) = 0;
 
-        virtual Result<std::vector<DebugThreadInfo>> EnumerateThreads() = 0;
+        virtual Expected<std::vector<DebugThreadInfo>> EnumerateThreads() = 0;
     };
 }

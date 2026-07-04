@@ -126,7 +126,7 @@ namespace VSGDBCore
         }
 
         DebugError Error = InitializeWinsock();
-        if (!Error.Succeeded())
+        if (!Error.IsSuccess())
         {
             return Error;
         }
@@ -278,7 +278,7 @@ namespace VSGDBCore
         return DebugError::Success();
     }
 
-    Result<char>
+    Expected<char>
         GdbRemoteConnection::ReceiveChar()
     {
         char Character = 0;
@@ -291,7 +291,7 @@ namespace VSGDBCore
 
         if (Received == SOCKET_ERROR)
         {
-            return Result<char>::Failure(
+            return Expected<char>::Failure(
                 MakeWinsockError(
                     ErrorCode::BackendFailure,
                     L"recv failed."));
@@ -299,24 +299,24 @@ namespace VSGDBCore
 
         if (Received == 0)
         {
-            return Result<char>::Failure(
+            return Expected<char>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"Connection closed by remote target."));
         }
 
-        return Result<char>::Success(Character);
+        return Expected<char>::Success(Character);
     }
 
-    Result<std::string>
+    Expected<std::string>
         GdbRemoteConnection::ReceivePacket()
     {
         for (;;)
         {
-            Result<char> StartResult = ReceiveChar();
-            if (!StartResult.Succeeded())
+            Expected<char> StartResult = ReceiveChar();
+            if (!StartResult.HasValue())
             {
-                return Result<std::string>::Failure(StartResult.Error);
+                return Expected<std::string>::Failure(StartResult.Error);
             }
 
             if (StartResult.Value == '$')
@@ -333,10 +333,10 @@ namespace VSGDBCore
 
         for (;;)
         {
-            Result<char> CharacterResult = ReceiveChar();
-            if (!CharacterResult.Succeeded())
+            Expected<char> CharacterResult = ReceiveChar();
+            if (!CharacterResult.HasValue())
             {
-                return Result<std::string>::Failure(CharacterResult.Error);
+                return Expected<std::string>::Failure(CharacterResult.Error);
             }
 
             const char Character = CharacterResult.Value;
@@ -349,16 +349,16 @@ namespace VSGDBCore
             Payload.push_back(Character);
         }
 
-        Result<char> HighResult = ReceiveChar();
-        if (!HighResult.Succeeded())
+        Expected<char> HighResult = ReceiveChar();
+        if (!HighResult.HasValue())
         {
-            return Result<std::string>::Failure(HighResult.Error);
+            return Expected<std::string>::Failure(HighResult.Error);
         }
 
-        Result<char> LowResult = ReceiveChar();
-        if (!LowResult.Succeeded())
+        Expected<char> LowResult = ReceiveChar();
+        if (!LowResult.HasValue())
         {
-            return Result<std::string>::Failure(LowResult.Error);
+            return Expected<std::string>::Failure(LowResult.Error);
         }
 
         U8 ReceivedChecksum = 0;
@@ -367,7 +367,7 @@ namespace VSGDBCore
             LowResult.Value,
             ReceivedChecksum))
         {
-            return Result<std::string>::Failure(
+            return Expected<std::string>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"Invalid GDB packet checksum text."));
@@ -380,7 +380,7 @@ namespace VSGDBCore
             const char Nak = '-';
             SendRaw(&Nak, 1);
 
-            return Result<std::string>::Failure(
+            return Expected<std::string>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"GDB packet checksum mismatch."));
@@ -388,21 +388,21 @@ namespace VSGDBCore
 
         const char Ack = '+';
         DebugError AckError = SendRaw(&Ack, 1);
-        if (!AckError.Succeeded())
+        if (!AckError.IsSuccess())
         {
-            return Result<std::string>::Failure(AckError);
+            return Expected<std::string>::Failure(AckError);
         }
 
-        return Result<std::string>::Success(Payload);
+        return Expected<std::string>::Success(Payload);
     }
 
-    Result<std::string>
+    Expected<std::string>
         GdbRemoteConnection::SendCommand(
             const std::string& Payload)
     {
         if (!Connected)
         {
-            return Result<std::string>::Failure(
+            return Expected<std::string>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotConnected,
                     L"GDB remote connection is not connected."));
@@ -414,20 +414,20 @@ namespace VSGDBCore
             Packet.data(),
             Packet.size());
 
-        if (!SendError.Succeeded())
+        if (!SendError.IsSuccess())
         {
-            return Result<std::string>::Failure(SendError);
+            return Expected<std::string>::Failure(SendError);
         }
 
-        Result<char> AckResult = ReceiveChar();
-        if (!AckResult.Succeeded())
+        Expected<char> AckResult = ReceiveChar();
+        if (!AckResult.HasValue())
         {
-            return Result<std::string>::Failure(AckResult.Error);
+            return Expected<std::string>::Failure(AckResult.Error);
         }
 
         if (AckResult.Value == '-')
         {
-            return Result<std::string>::Failure(
+            return Expected<std::string>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"GDB remote target rejected packet."));
@@ -435,7 +435,7 @@ namespace VSGDBCore
 
         if (AckResult.Value != '+')
         {
-            return Result<std::string>::Failure(
+            return Expected<std::string>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"GDB remote target did not acknowledge packet."));
@@ -458,12 +458,12 @@ namespace VSGDBCore
         return SendRaw(&Interrupt, 1);
     }
 
-    Result<std::string>
+    Expected<std::string>
         GdbRemoteConnection::ReceiveResponsePacket()
     {
         if (!Connected)
         {
-            return Result<std::string>::Failure(
+            return Expected<std::string>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotConnected,
                     L"GDB remote connection is not connected."));

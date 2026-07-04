@@ -25,47 +25,47 @@ namespace VSGDBCore
                 L"Symbol manager is not available.");
         }
 
-        Result<ResolvedSymbol> GetNearestSymbol(
+        Expected<ResolvedSymbol> GetNearestSymbol(
             U64 Address) const override
         {
             (void)Address;
 
-            return Result<ResolvedSymbol>::Failure(
+            return Expected<ResolvedSymbol>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Symbol manager is not available."));
         }
 
-        Result<ResolvedSymbol> AddressToSymbol(
+        Expected<ResolvedSymbol> AddressToSymbol(
             U64 Address) const override
         {
             (void)Address;
 
-            return Result<ResolvedSymbol>::Failure(
+            return Expected<ResolvedSymbol>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Symbol manager is not available."));
         }
 
-        Result<SourceLocation> AddressToSourceLine(
+        Expected<SourceLocation> AddressToSourceLine(
             U64 Address) const override
         {
             (void)Address;
 
-            return Result<SourceLocation>::Failure(
+            return Expected<SourceLocation>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Symbol manager is not available."));
         }
 
-        Result<std::vector<U64>> SourceLineToAddress(
+        Expected<std::vector<U64>> SourceLineToAddress(
             const std::wstring& FilePath,
             U32 Line) const override
         {
             (void)FilePath;
             (void)Line;
 
-            return Result<std::vector<U64>>::Failure(
+            return Expected<std::vector<U64>>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Symbol manager is not available."));

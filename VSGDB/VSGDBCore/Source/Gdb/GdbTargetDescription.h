@@ -8,7 +8,7 @@
 
 namespace VSGDBCore
 {
-    Result<RegisterDescriptorSet> ParseGdbTargetDescription(
+    Expected<RegisterDescriptorSet> ParseGdbTargetDescription(
         const std::string& XmlText);
 
     std::vector<std::string> ParseGdbTargetIncludeHrefs(

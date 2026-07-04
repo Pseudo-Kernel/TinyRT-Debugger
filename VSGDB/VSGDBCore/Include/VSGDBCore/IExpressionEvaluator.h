@@ -26,7 +26,7 @@ namespace VSGDBCore
     public:
         virtual ~IExpressionEvaluator() = default;
 
-        virtual Result<ExpressionValue> Evaluate(
+        virtual Expected<ExpressionValue> Evaluate(
             const std::wstring& Expression) = 0;
 
         virtual DebugError DeclareVariable(
@@ -40,7 +40,7 @@ namespace VSGDBCore
             const std::wstring& Name,
             const ExpressionValue& Value) = 0;
 
-        virtual Result<ExpressionValue> GetVariable(
+        virtual Expected<ExpressionValue> GetVariable(
             const std::wstring& Name) const = 0;
     };
 }

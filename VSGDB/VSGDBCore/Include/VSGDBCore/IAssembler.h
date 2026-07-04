@@ -16,7 +16,7 @@ namespace VSGDBCore
         virtual DebugError SetArchitecture(
             ProcessorArchitecture Architecture) = 0;
 
-        virtual Result<ByteVector> Assemble(
+        virtual Expected<ByteVector> Assemble(
             U64 Address,
             const std::wstring& Text) = 0;
     };

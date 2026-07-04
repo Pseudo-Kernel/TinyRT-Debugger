@@ -19,7 +19,9 @@ namespace VSGDBCore
     static constexpr U64 PageBaseMask1G =
         0x000fffffc0000000ull;
 
-    static Result<U64>
+    static constexpr U64 Cr0WriteProtect = 1ull << 16;
+
+    static Expected<U64>
         ReadPhysicalU64(
             IDebugTarget& Target,
             U64 PhysicalAddress)
@@ -28,14 +30,14 @@ namespace VSGDBCore
             PhysicalAddress,
             sizeof(U64));
 
-        if (!Bytes.Succeeded())
+        if (!Bytes.HasValue())
         {
-            return Result<U64>::Failure(Bytes.Error);
+            return Expected<U64>::Failure(Bytes.Error);
         }
 
         if (Bytes.Value.size() != sizeof(U64))
         {
-            return Result<U64>::Failure(
+            return Expected<U64>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"Physical memory read returned unexpected size."));
@@ -50,7 +52,43 @@ namespace VSGDBCore
                 << (Index * 8);
         }
 
-        return Result<U64>::Success(Value);
+        return Expected<U64>::Success(Value);
+    }
+
+    struct X64EffectivePagePermissions
+    {
+        bool Present = true;
+        bool Write = true;
+        bool User = true;
+        bool NoExecute = false;
+    };
+
+    static X64EffectivePagePermissions
+        ComputeEffectivePermissions(
+            const std::vector<X64PageEntry>& Entries)
+    {
+        X64EffectivePagePermissions Permissions{};
+
+        for (const X64PageEntry& Entry : Entries)
+        {
+            Permissions.Present =
+                Permissions.Present &&
+                Entry.Present;
+
+            Permissions.Write =
+                Permissions.Write &&
+                Entry.Write;
+
+            Permissions.User =
+                Permissions.User &&
+                Entry.User;
+
+            Permissions.NoExecute =
+                Permissions.NoExecute ||
+                Entry.NoExecute;
+        }
+
+        return Permissions;
     }
 
     X64VirtualAddressParts
@@ -177,7 +215,7 @@ namespace VSGDBCore
         return Result;
     }
 
-    Result<X64AddressTranslationResult>
+    Expected<X64AddressTranslationResult>
         TranslateX64VirtualAddress(
             IDebugTarget& Target,
             const X64PagingContext& Context,
@@ -190,7 +228,7 @@ namespace VSGDBCore
 
         if (!IsCanonicalX64VirtualAddress(VirtualAddress))
         {
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 MakeFailure(
                     VirtualAddress,
                     Context,
@@ -204,7 +242,7 @@ namespace VSGDBCore
             (Context.Cr4 & Cr4PaeEnabled) == 0 ||
             (Context.Efer & EferLongModeActive) == 0)
         {
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 MakeFailure(
                     VirtualAddress,
                     Context,
@@ -221,9 +259,9 @@ namespace VSGDBCore
             Pml4Base + static_cast<U64>(Parts.Pml4Index) * sizeof(U64);
 
         auto Pml4eValue = ReadPhysicalU64(Target, Pml4eAddress);
-        if (!Pml4eValue.Succeeded())
+        if (!Pml4eValue.HasValue())
         {
-            return Result<X64AddressTranslationResult>::Failure(
+            return Expected<X64AddressTranslationResult>::Failure(
                 Pml4eValue.Error);
         }
 
@@ -236,7 +274,7 @@ namespace VSGDBCore
 
         if (!Pml4e.Present)
         {
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 MakeFailure(
                     VirtualAddress,
                     Context,
@@ -251,9 +289,9 @@ namespace VSGDBCore
             static_cast<U64>(Parts.PdptIndex) * sizeof(U64);
 
         auto PdpteValue = ReadPhysicalU64(Target, PdpteAddress);
-        if (!PdpteValue.Succeeded())
+        if (!PdpteValue.HasValue())
         {
-            return Result<X64AddressTranslationResult>::Failure(
+            return Expected<X64AddressTranslationResult>::Failure(
                 PdpteValue.Error);
         }
 
@@ -266,7 +304,7 @@ namespace VSGDBCore
 
         if (!Pdpte.Present)
         {
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 MakeFailure(
                     VirtualAddress,
                     Context,
@@ -290,7 +328,7 @@ namespace VSGDBCore
                 Pdpte.PagePhysicalBase +
                 (VirtualAddress & PageOffsetMask1G);
 
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 Translation);
         }
 
@@ -299,9 +337,9 @@ namespace VSGDBCore
             static_cast<U64>(Parts.PdIndex) * sizeof(U64);
 
         auto PdeValue = ReadPhysicalU64(Target, PdeAddress);
-        if (!PdeValue.Succeeded())
+        if (!PdeValue.HasValue())
         {
-            return Result<X64AddressTranslationResult>::Failure(
+            return Expected<X64AddressTranslationResult>::Failure(
                 PdeValue.Error);
         }
 
@@ -314,7 +352,7 @@ namespace VSGDBCore
 
         if (!Pde.Present)
         {
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 MakeFailure(
                     VirtualAddress,
                     Context,
@@ -338,7 +376,7 @@ namespace VSGDBCore
                 Pde.PagePhysicalBase +
                 (VirtualAddress & PageOffsetMask2M);
 
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 Translation);
         }
 
@@ -347,9 +385,9 @@ namespace VSGDBCore
             static_cast<U64>(Parts.PtIndex) * sizeof(U64);
 
         auto PteValue = ReadPhysicalU64(Target, PteAddress);
-        if (!PteValue.Succeeded())
+        if (!PteValue.HasValue())
         {
-            return Result<X64AddressTranslationResult>::Failure(
+            return Expected<X64AddressTranslationResult>::Failure(
                 PteValue.Error);
         }
 
@@ -362,7 +400,7 @@ namespace VSGDBCore
 
         if (!Pte.Present)
         {
-            return Result<X64AddressTranslationResult>::Success(
+            return Expected<X64AddressTranslationResult>::Success(
                 MakeFailure(
                     VirtualAddress,
                     Context,
@@ -384,7 +422,188 @@ namespace VSGDBCore
             Pte.PagePhysicalBase +
             (VirtualAddress & PageOffsetMask4K);
 
-        return Result<X64AddressTranslationResult>::Success(
+        return Expected<X64AddressTranslationResult>::Success(
             Translation);
+    }
+
+    X64PageFaultErrorCode
+        DecodeX64PageFaultErrorCode(
+            U64 ErrorCode)
+    {
+        X64PageFaultErrorCode Decoded{};
+
+        Decoded.Value = ErrorCode;
+
+        Decoded.Present = (ErrorCode & (1ull << 0)) != 0;
+        Decoded.Write = (ErrorCode & (1ull << 1)) != 0;
+        Decoded.User = (ErrorCode & (1ull << 2)) != 0;
+        Decoded.ReservedBit = (ErrorCode & (1ull << 3)) != 0;
+        Decoded.InstructionFetch = (ErrorCode & (1ull << 4)) != 0;
+        Decoded.ProtectionKey = (ErrorCode & (1ull << 5)) != 0;
+        Decoded.ShadowStack = (ErrorCode & (1ull << 6)) != 0;
+        Decoded.Sgx = (ErrorCode & (1ull << 15)) != 0;
+
+        return Decoded;
+    }
+
+    X64PageFaultAnalysis
+        AnalyzeX64PageFault(
+            const X64PagingContext& Context,
+            const X64AddressTranslationResult& Translation,
+            U64 ErrorCode)
+    {
+        X64PageFaultAnalysis Analysis{};
+
+        Analysis.ErrorCode = DecodeX64PageFaultErrorCode(ErrorCode);
+
+        if (Analysis.ErrorCode.InstructionFetch)
+        {
+            Analysis.AccessKind = X64PageFaultAccessKind::Execute;
+        }
+        else if (Analysis.ErrorCode.Write)
+        {
+            Analysis.AccessKind = X64PageFaultAccessKind::Write;
+        }
+        else
+        {
+            Analysis.AccessKind = X64PageFaultAccessKind::Read;
+        }
+
+        Analysis.TranslationSucceeded = Translation.Success;
+        Analysis.NotPresentFault = !Analysis.ErrorCode.Present;
+        Analysis.ProtectionViolation = Analysis.ErrorCode.Present;
+
+        if (Analysis.ErrorCode.ReservedBit)
+        {
+            Analysis.CausedByReservedBit = true;
+            Analysis.Summary =
+                L"Page fault was caused by a reserved-bit violation.";
+            return Analysis;
+        }
+
+        if (Translation.FailureReason ==
+            X64PagingFailureReason::NonCanonicalAddress)
+        {
+            Analysis.CausedByNonCanonicalAddress = true;
+            Analysis.Summary =
+                L"Page fault was caused by a non-canonical virtual address.";
+            return Analysis;
+        }
+
+        if (!Translation.Success)
+        {
+            switch (Translation.FailureReason)
+            {
+            case X64PagingFailureReason::Pml4eNotPresent:
+                Analysis.CausedByNotPresentEntry = true;
+                Analysis.Summary =
+                    L"PML4E is not present.";
+                return Analysis;
+
+            case X64PagingFailureReason::PdpteNotPresent:
+                Analysis.CausedByNotPresentEntry = true;
+                Analysis.Summary =
+                    L"PDPTE is not present.";
+                return Analysis;
+
+            case X64PagingFailureReason::PdeNotPresent:
+                Analysis.CausedByNotPresentEntry = true;
+                Analysis.Summary =
+                    L"PDE is not present.";
+                return Analysis;
+
+            case X64PagingFailureReason::PteNotPresent:
+                Analysis.CausedByNotPresentEntry = true;
+                Analysis.Summary =
+                    L"PTE is not present.";
+                return Analysis;
+
+            default:
+                Analysis.Summary =
+                    L"Address translation failed before permission analysis.";
+                return Analysis;
+            }
+        }
+
+        const X64EffectivePagePermissions Permissions =
+            ComputeEffectivePermissions(Translation.Entries);
+
+        //
+        // Protection-violation cases should normally have PFEC.P = 1.
+        // If PFEC.P = 0 but translation succeeded, the observed CR3/page tables
+        // are inconsistent with the fault error code.
+        //
+        if (Analysis.NotPresentFault)
+        {
+            Analysis.Summary =
+                L"Page fault was reported as not-present, but translation succeeded. "
+                L"This may indicate stale state, wrong CR3, or a race with page-table updates.";
+            return Analysis;
+        }
+
+        if (Analysis.ErrorCode.Write && !Permissions.Write)
+        {
+            if (!Analysis.ErrorCode.User &&
+                !IsX64SupervisorWriteProtectEnabled(Context))
+            {
+                Analysis.Summary =
+                    L"Supervisor write access targets a read-only page, but CR0.WP is clear. "
+                    L"Supervisor writes to read-only pages are normally permitted when CR0.WP is clear.";
+                return Analysis;
+            }
+
+            Analysis.CausedByWriteToReadOnlyPage = true;
+            Analysis.Summary =
+                L"Page fault was caused by a write access to a read-only page.";
+            return Analysis;
+        }
+
+        if (Analysis.ErrorCode.User && !Permissions.User)
+        {
+            Analysis.CausedByUserAccessToSupervisorPage = true;
+            Analysis.Summary =
+                L"Page fault was caused by user-mode access to a supervisor page.";
+            return Analysis;
+        }
+
+        if (Analysis.ErrorCode.InstructionFetch && Permissions.NoExecute)
+        {
+            Analysis.CausedByExecuteOnNxPage = true;
+            Analysis.Summary =
+                L"Page fault was caused by instruction fetch from an NX page.";
+            return Analysis;
+        }
+
+        if (Analysis.ErrorCode.ProtectionKey)
+        {
+            Analysis.Summary =
+                L"Page fault involved protection-key access control.";
+            return Analysis;
+        }
+
+        if (Analysis.ErrorCode.ShadowStack)
+        {
+            Analysis.Summary =
+                L"Page fault involved shadow-stack access.";
+            return Analysis;
+        }
+
+        if (Analysis.ErrorCode.Sgx)
+        {
+            Analysis.Summary =
+                L"Page fault involved SGX access control.";
+            return Analysis;
+        }
+
+        Analysis.Summary =
+            L"Page fault was a protection violation, but no simple permission cause was identified.";
+
+        return Analysis;
+    }
+
+    bool IsX64SupervisorWriteProtectEnabled(
+        const X64PagingContext& Context)
+    {
+        return (Context.Cr0 & Cr0WriteProtect) != 0;
     }
 }

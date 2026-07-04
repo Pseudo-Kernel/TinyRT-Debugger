@@ -126,7 +126,7 @@ namespace VSGDBCore
         return Hrefs;
     }
 
-    Result<RegisterDescriptorSet>
+    Expected<RegisterDescriptorSet>
         ParseGdbTargetDescription(
             const std::string& XmlText)
     {
@@ -178,7 +178,7 @@ namespace VSGDBCore
             Set.Registers.push_back(Descriptor);
         }
 
-        return Result<RegisterDescriptorSet>::Success(Set);
+        return Expected<RegisterDescriptorSet>::Success(Set);
     }
 
     const RegisterDescriptor*

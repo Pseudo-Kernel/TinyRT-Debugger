@@ -18,16 +18,16 @@ namespace VSGDBCore
         virtual DebugError UnloadSymbols(
             const std::wstring& ModuleName) = 0;
 
-        virtual Result<ResolvedSymbol> GetNearestSymbol(
+        virtual Expected<ResolvedSymbol> GetNearestSymbol(
             U64 Address) const = 0;
 
-        virtual Result<ResolvedSymbol> AddressToSymbol(
+        virtual Expected<ResolvedSymbol> AddressToSymbol(
             U64 Address) const = 0;
 
-        virtual Result<SourceLocation> AddressToSourceLine(
+        virtual Expected<SourceLocation> AddressToSourceLine(
             U64 Address) const = 0;
 
-        virtual Result<std::vector<U64>> SourceLineToAddress(
+        virtual Expected<std::vector<U64>> SourceLineToAddress(
             const std::wstring& FilePath,
             U32 Line) const = 0;
     };

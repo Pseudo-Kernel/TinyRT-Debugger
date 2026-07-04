@@ -24,12 +24,12 @@ namespace VSGDBCore
 
         bool IsConnected() const;
 
-        Result<std::string> SendCommand(
+        Expected<std::string> SendCommand(
             const std::string& Payload);
 
         DebugError SendInterrupt();
 
-        Result<std::string> ReceiveResponsePacket();
+        Expected<std::string> ReceiveResponsePacket();
 
     private:
         DebugError InitializeWinsock();
@@ -37,8 +37,8 @@ namespace VSGDBCore
             const char* Buffer,
             size_t Size);
 
-        Result<char> ReceiveChar();
-        Result<std::string> ReceivePacket();
+        Expected<char> ReceiveChar();
+        Expected<std::string> ReceivePacket();
 
     private:
         uintptr_t SocketValue = static_cast<uintptr_t>(~0ull);

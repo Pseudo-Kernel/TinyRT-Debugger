@@ -7,12 +7,12 @@ namespace VSGDBCore
     class SimpleExpressionEvaluator final : public IExpressionEvaluator
     {
     public:
-        Result<ExpressionValue> Evaluate(
+        Expected<ExpressionValue> Evaluate(
             const std::wstring& Expression) override
         {
             if (Expression.empty())
             {
-                return Result<ExpressionValue>::Failure(
+                return Expected<ExpressionValue>::Failure(
                     DebugError::Failure(
                         ErrorCode::InvalidArgument,
                         L"Expression is empty."));
@@ -21,10 +21,10 @@ namespace VSGDBCore
             auto Variable = Variables.find(Expression);
             if (Variable != Variables.end())
             {
-                return Result<ExpressionValue>::Success(Variable->second);
+                return Expected<ExpressionValue>::Success(Variable->second);
             }
 
-            return Result<ExpressionValue>::Failure(
+            return Expected<ExpressionValue>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Expression evaluation is not implemented yet."));
@@ -82,19 +82,19 @@ namespace VSGDBCore
             return DebugError::Success();
         }
 
-        Result<ExpressionValue> GetVariable(
+        Expected<ExpressionValue> GetVariable(
             const std::wstring& Name) const override
         {
             auto Variable = Variables.find(Name);
             if (Variable == Variables.end())
             {
-                return Result<ExpressionValue>::Failure(
+                return Expected<ExpressionValue>::Failure(
                     DebugError::Failure(
                         ErrorCode::InvalidArgument,
                         L"Variable does not exist."));
             }
 
-            return Result<ExpressionValue>::Success(Variable->second);
+            return Expected<ExpressionValue>::Success(Variable->second);
         }
 
     private:

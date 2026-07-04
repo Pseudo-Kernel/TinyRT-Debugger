@@ -20,14 +20,14 @@ namespace VSGDBCore
                 L"Assembler is not available.");
         }
 
-        Result<ByteVector> Assemble(
+        Expected<ByteVector> Assemble(
             U64 Address,
             const std::wstring& Text) override
         {
             (void)Address;
             (void)Text;
 
-            return Result<ByteVector>::Failure(
+            return Expected<ByteVector>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Assembler is not available."));

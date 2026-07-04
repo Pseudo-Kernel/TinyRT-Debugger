@@ -20,7 +20,7 @@ namespace VSGDBCore
                 L"Disassembler is not available.");
         }
 
-        Result<std::vector<DisassembledInstruction>> Disassemble(
+        Expected<std::vector<DisassembledInstruction>> Disassemble(
             U64 Address,
             const ByteVector& Bytes,
             U32 MaxInstructionCount) override
@@ -29,7 +29,7 @@ namespace VSGDBCore
             (void)Bytes;
             (void)MaxInstructionCount;
 
-            return Result<std::vector<DisassembledInstruction>>::Failure(
+            return Expected<std::vector<DisassembledInstruction>>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Disassembler is not available."));

@@ -109,13 +109,13 @@ namespace VSGDBCore
         return Text;
     }
 
-    Result<ByteVector>
+    Expected<ByteVector>
         DecodeHexBytes(
             const std::string& HexText)
     {
         if ((HexText.size() & 1) != 0)
         {
-            return Result<ByteVector>::Failure(
+            return Expected<ByteVector>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"Hex byte text has odd length."));
@@ -133,7 +133,7 @@ namespace VSGDBCore
                 HexText[Offset + 1],
                 Byte))
             {
-                return Result<ByteVector>::Failure(
+                return Expected<ByteVector>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"Hex byte text contains invalid character."));
@@ -142,6 +142,6 @@ namespace VSGDBCore
             Bytes.push_back(Byte);
         }
 
-        return Result<ByteVector>::Success(Bytes);
+        return Expected<ByteVector>::Success(Bytes);
     }
 }

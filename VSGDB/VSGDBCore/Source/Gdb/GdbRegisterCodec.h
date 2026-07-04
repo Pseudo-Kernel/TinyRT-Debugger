@@ -7,10 +7,10 @@
 
 namespace VSGDBCore
 {
-    Result<RegisterContext> DecodeX64GdbRegisters(
+    Expected<RegisterContext> DecodeX64GdbRegisters(
         const std::string& HexText);
 
-    Result<U64> DecodeGdbRegisterValueToU64(
+    Expected<U64> DecodeGdbRegisterValueToU64(
         const std::string& HexText,
         U32 BitSize);
 }

@@ -9,26 +9,26 @@
 
 namespace VSGDBCore
 {
-    static Result<int>
+    static Expected<int>
         GetGdbBreakpointType(
             BreakpointKind Kind)
     {
         switch (Kind)
         {
         case BreakpointKind::Software:
-            return Result<int>::Success(0);
+            return Expected<int>::Success(0);
 
         case BreakpointKind::HardwareExecute:
-            return Result<int>::Success(1);
+            return Expected<int>::Success(1);
 
         case BreakpointKind::HardwareWrite:
-            return Result<int>::Success(2);
+            return Expected<int>::Success(2);
 
         case BreakpointKind::HardwareAccess:
-            return Result<int>::Success(4);
+            return Expected<int>::Success(4);
 
         default:
-            return Result<int>::Failure(
+            return Expected<int>::Failure(
                 DebugError::Failure(
                     ErrorCode::InvalidArgument,
                     L"Invalid breakpoint kind."));
@@ -113,19 +113,19 @@ namespace VSGDBCore
         GdbRemoteTarget::Break()
     {
         DebugError Error = Connection.SendInterrupt();
-        if (!Error.Succeeded())
+        if (!Error.IsSuccess())
         {
             return Error;
         }
 
         auto Reply = Connection.ReceiveResponsePacket();
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
 
         auto Event = DecodeStopReply(Reply.Value);
-        if (!Event.Succeeded())
+        if (!Event.HasValue())
         {
             return Event.Error;
         }
@@ -141,26 +141,26 @@ namespace VSGDBCore
             U32 CpuId)
     {
         auto ThreadId = GetRemoteThreadIdFromCpuId(CpuId);
-        if (!ThreadId.Succeeded())
+        if (!ThreadId.HasValue())
         {
             return ThreadId.Error;
         }
 
         DebugError SelectError = SelectContinueThread(ThreadId.Value);
-        if (!SelectError.Succeeded())
+        if (!SelectError.IsSuccess())
         {
             return SelectError;
         }
 
         auto Reply = Connection.SendCommand("c");
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
 
         auto Event = DecodeStopReply(Reply.Value);
-        if (!Event.Succeeded())
+        if (!Event.HasValue())
         {
             return Event.Error;
         }
@@ -174,15 +174,21 @@ namespace VSGDBCore
     DebugError
         GdbRemoteTarget::ContinueAll()
     {
+        DebugError SelectError = SelectContinueThread("-1");
+        if (!SelectError.IsSuccess())
+        {
+            return SelectError;
+        }
+
         auto Reply = Connection.SendCommand("c");
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
 
         auto Event = DecodeStopReply(Reply.Value);
-        if (!Event.Succeeded())
+        if (!Event.HasValue())
         {
             return Event.Error;
         }
@@ -198,26 +204,26 @@ namespace VSGDBCore
             U32 CpuId)
     {
         auto ThreadId = GetRemoteThreadIdFromCpuId(CpuId);
-        if (!ThreadId.Succeeded())
+        if (!ThreadId.HasValue())
         {
             return ThreadId.Error;
         }
 
         DebugError SelectError = SelectContinueThread(ThreadId.Value);
-        if (!SelectError.Succeeded())
+        if (!SelectError.IsSuccess())
         {
             return SelectError;
         }
 
         auto Reply = Connection.SendCommand("s");
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
 
         auto Event = DecodeStopReply(Reply.Value);
-        if (!Event.Succeeded())
+        if (!Event.HasValue())
         {
             return Event.Error;
         }
@@ -228,7 +234,7 @@ namespace VSGDBCore
         return DebugError::Success();
     }
 
-    Result<DebugEvent>
+    Expected<DebugEvent>
         GdbRemoteTarget::WaitForEvent(
             U32 TimeoutMilliseconds)
     {
@@ -237,44 +243,44 @@ namespace VSGDBCore
         if (HasLastEvent)
         {
             HasLastEvent = false;
-            return Result<DebugEvent>::Success(LastEvent);
+            return Expected<DebugEvent>::Success(LastEvent);
         }
 
         auto Reply = Connection.SendCommand("?");
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
-            return Result<DebugEvent>::Failure(Reply.Error);
+            return Expected<DebugEvent>::Failure(Reply.Error);
         }
 
         return DecodeStopReply(Reply.Value);
     }
 
-    Result<RegisterContext>
+    Expected<RegisterContext>
         GdbRemoteTarget::GetRegisters(
             U32 CpuId)
     {
         auto ThreadId = GetRemoteThreadIdFromCpuId(CpuId);
-        if (!ThreadId.Succeeded())
+        if (!ThreadId.HasValue())
         {
-            return Result<RegisterContext>::Failure(ThreadId.Error);
+            return Expected<RegisterContext>::Failure(ThreadId.Error);
         }
 
         DebugError SelectError = SelectRegisterThread(ThreadId.Value);
-        if (!SelectError.Succeeded())
+        if (!SelectError.IsSuccess())
         {
-            return Result<RegisterContext>::Failure(SelectError);
+            return Expected<RegisterContext>::Failure(SelectError);
         }
 
         auto Reply = Connection.SendCommand("g");
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
-            return Result<RegisterContext>::Failure(Reply.Error);
+            return Expected<RegisterContext>::Failure(Reply.Error);
         }
 
         auto Decoded = DecodeX64GdbRegisters(Reply.Value);
-        if (!Decoded.Succeeded())
+        if (!Decoded.HasValue())
         {
             return Decoded;
         }
@@ -284,7 +290,7 @@ namespace VSGDBCore
         auto TryRead = [&](const char* Name, U64& Field)
             {
                 auto Value = ReadRegisterByName(CpuId, Name);
-                if (Value.Succeeded())
+                if (Value.HasValue())
                 {
                     Field = Value.Value;
                 }
@@ -302,7 +308,7 @@ namespace VSGDBCore
 
         TryRead("efer", Context.Efer);
 
-        return Result<RegisterContext>::Success(Context);
+        return Expected<RegisterContext>::Success(Context);
     }
 
     DebugError
@@ -320,22 +326,76 @@ namespace VSGDBCore
             L"SetRegister is not implemented yet.");
     }
 
-    Result<ByteVector>
+    Expected<ByteVector>
         GdbRemoteTarget::ReadVirtualMemory(
             U32 CpuId,
             U64 Address,
             U32 Size)
     {
-        auto ThreadId = GetRemoteThreadIdFromCpuId(CpuId);
-        if (!ThreadId.Succeeded())
+        if (Size == 0)
         {
-            return Result<ByteVector>::Failure(ThreadId.Error);
+            return Expected<ByteVector>::Success(ByteVector{});
+        }
+
+        constexpr U32 MaxGdbMemoryReadSize = 0x800;
+
+        ByteVector Result;
+        Result.reserve(Size);
+
+        U64 CurrentAddress = Address;
+        U32 Remaining = Size;
+
+        while (Remaining != 0)
+        {
+            const U32 CurrentSize =
+                std::min<U32>(Remaining, MaxGdbMemoryReadSize);
+
+            auto Chunk = ReadVirtualMemorySingle(
+                CpuId,
+                CurrentAddress,
+                CurrentSize);
+
+            if (!Chunk.HasValue())
+            {
+                return Chunk;
+            }
+
+            if (Chunk.Value.size() != CurrentSize)
+            {
+                return Expected<ByteVector>::Failure(
+                    DebugError::Failure(
+                        ErrorCode::MemoryReadFailure,
+                        L"GDB remote target returned a short memory read."));
+            }
+
+            Result.insert(
+                Result.end(),
+                Chunk.Value.begin(),
+                Chunk.Value.end());
+
+            CurrentAddress += CurrentSize;
+            Remaining -= CurrentSize;
+        }
+
+        return Expected<ByteVector>::Success(std::move(Result));
+    }
+
+    Expected<ByteVector>
+        GdbRemoteTarget::ReadVirtualMemorySingle(
+            U32 CpuId,
+            U64 Address,
+            U32 Size)
+    {
+        auto ThreadId = GetRemoteThreadIdFromCpuId(CpuId);
+        if (!ThreadId.HasValue())
+        {
+            return Expected<ByteVector>::Failure(ThreadId.Error);
         }
 
         DebugError SelectError = SelectRegisterThread(ThreadId.Value);
-        if (!SelectError.Succeeded())
+        if (!SelectError.IsSuccess())
         {
-            return Result<ByteVector>::Failure(SelectError);
+            return Expected<ByteVector>::Failure(SelectError);
         }
 
         return ReadMemoryUsingGdbM(
@@ -371,7 +431,7 @@ namespace VSGDBCore
 
         auto Reply = Connection.SendCommand(Command);
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
@@ -386,20 +446,20 @@ namespace VSGDBCore
             L"GDB remote target failed to write memory.");
     }
 
-    Result<ByteVector>
+    Expected<ByteVector>
         GdbRemoteTarget::ReadPhysicalMemory(
             U64 Address,
             U32 Size)
     {
         if (Size == 0)
         {
-            return Result<ByteVector>::Success(ByteVector{});
+            return Expected<ByteVector>::Success(ByteVector{});
         }
 
         DebugError EnableError = SetQemuPhysicalMemoryMode(true);
-        if (!EnableError.Succeeded())
+        if (!EnableError.IsSuccess())
         {
-            return Result<ByteVector>::Failure(EnableError);
+            return Expected<ByteVector>::Failure(EnableError);
         }
 
         auto Bytes = ReadMemoryUsingGdbM(
@@ -408,9 +468,9 @@ namespace VSGDBCore
 
         DebugError DisableError = SetQemuPhysicalMemoryMode(false);
 
-        if (!DisableError.Succeeded() && Bytes.Succeeded())
+        if (!DisableError.IsSuccess() && Bytes.HasValue())
         {
-            return Result<ByteVector>::Failure(DisableError);
+            return Expected<ByteVector>::Failure(DisableError);
         }
 
         return Bytes;
@@ -429,111 +489,317 @@ namespace VSGDBCore
             L"WritePhysicalMemory is not implemented yet.");
     }
 
-    Result<BreakpointId>
+    Expected<BreakpointId>
         GdbRemoteTarget::SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size)
     {
-        auto Type = GetGdbBreakpointType(Kind);
-        if (!Type.Succeeded())
-        {
-            return Result<BreakpointId>::Failure(Type.Error);
-        }
-
-        if (Size == 0)
-        {
-            return Result<BreakpointId>::Failure(
-                DebugError::Failure(
-                    ErrorCode::InvalidArgument,
-                    L"Breakpoint size is zero."));
-        }
-
-        char Command[64]{};
-
-        sprintf_s(
-            Command,
-            "Z%d,%llx,%x",
-            Type.Value,
+        DebugError Error = InsertRemoteBreakpoint(
+            Kind,
             Address,
             Size);
 
-        auto Reply = Connection.SendCommand(Command);
-
-        if (!Reply.Succeeded())
+        if (!Error.IsSuccess())
         {
-            return Result<BreakpointId>::Failure(Reply.Error);
+            return Expected<BreakpointId>::Failure(Error);
         }
 
-        if (Reply.Value != "OK")
-        {
-            return Result<BreakpointId>::Failure(
-                DebugError::Failure(
-                    ErrorCode::BackendFailure,
-                    L"GDB remote target failed to set breakpoint."));
-        }
+        const BreakpointId Id = NextBreakpointId++;
 
         BreakpointInfo Info{};
-        Info.Id = NextBreakpointId++;
+        Info.Id = Id;
         Info.Kind = Kind;
         Info.Address = Address;
         Info.Size = Size;
         Info.Enabled = true;
+        Info.Inserted = true;
 
-        Breakpoints.emplace(Info.Id, Info);
+        Breakpoints.emplace(Id, Info);
 
-        return Result<BreakpointId>::Success(Info.Id);
+        return Expected<BreakpointId>::Success(Id);
     }
 
     DebugError
         GdbRemoteTarget::DeleteBreakpoint(
             BreakpointId Id)
     {
-        auto Entry = Breakpoints.find(Id);
-        if (Entry == Breakpoints.end())
+        auto It = Breakpoints.find(Id);
+        if (It == Breakpoints.end())
         {
             return DebugError::Failure(
-                ErrorCode::InvalidArgument,
-                L"Breakpoint ID does not exist.");
+                ErrorCode::BreakpointFailure,
+                L"Breakpoint was not found.");
         }
 
-        const BreakpointInfo Info = Entry->second;
+        BreakpointInfo& Breakpoint = It->second;
 
-        auto Type = GetGdbBreakpointType(Info.Kind);
-        if (!Type.Succeeded())
+        if (!Breakpoint.Enabled)
+        {
+            return DebugError::Failure(
+                ErrorCode::InvalidState,
+                L"Breakpoint is already disabled.");
+        }
+
+        if (Breakpoint.Inserted)
+        {
+            DebugError Error = DeleteRemoteBreakpoint(
+                Breakpoint.Kind,
+                Breakpoint.Address,
+                Breakpoint.Size);
+
+            if (!Error.IsSuccess())
+            {
+                return Error;
+            }
+
+            Breakpoint.Inserted = false;
+        }
+
+        Breakpoint.Enabled = false;
+        return DebugError::Success();
+    }
+
+    DebugError
+        GdbRemoteTarget::DeleteBreakpointByAddress(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size)
+    {
+        for (auto& Pair : Breakpoints)
+        {
+            BreakpointInfo& Breakpoint = Pair.second;
+
+            if (!Breakpoint.Enabled)
+            {
+                continue;
+            }
+
+            if (Breakpoint.Kind != Kind ||
+                Breakpoint.Address != Address ||
+                Breakpoint.Size != Size)
+            {
+                continue;
+            }
+
+            return DeleteBreakpoint(Breakpoint.Id);
+        }
+
+        //
+        // Stale/external breakpoint path.
+        //
+        return DeleteRemoteBreakpoint(
+            Kind,
+            Address,
+            Size);
+    }
+
+    DebugError
+        GdbRemoteTarget::InsertRemoteBreakpoint(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size)
+    {
+        auto Type = GetGdbBreakpointType(Kind);
+        if (!Type.HasValue())
         {
             return Type.Error;
         }
 
-        char Command[64]{};
+        char Packet[128]{};
 
-        sprintf_s(
-            Command,
-            "z%d,%llx,%x",
+        std::snprintf(
+            Packet,
+            sizeof(Packet),
+            "Z%d,%llx,%x",
             Type.Value,
-            Info.Address,
-            Info.Size);
+            Address,
+            Size);
 
-        auto Reply = Connection.SendCommand(Command);
-
-        if (!Reply.Succeeded())
+        auto Reply = Connection.SendCommand(Packet);
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
 
-        if (Reply.Value != "OK")
+        if (Reply.Value == "OK")
         {
-            return DebugError::Failure(
-                ErrorCode::BackendFailure,
-                L"GDB remote target failed to delete breakpoint.");
+            return DebugError::Success();
         }
 
-        Breakpoints.erase(Entry);
+        if (Reply.Value.empty())
+        {
+            return DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"Remote target does not support breakpoint insertion.");
+        }
 
+        return DebugError::Failure(
+            ErrorCode::BreakpointFailure,
+            L"Remote target rejected breakpoint insertion.");
+    }
+
+    DebugError
+        GdbRemoteTarget::DeleteRemoteBreakpoint(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size)
+    {
+        auto Type = GetGdbBreakpointType(Kind);
+        if (!Type.HasValue())
+        {
+            return Type.Error;
+        }
+
+        char Packet[128]{};
+
+        std::snprintf(
+            Packet,
+            sizeof(Packet),
+            "z%d,%llx,%x",
+            Type.Value,
+            Address,
+            Size);
+
+        auto Reply = Connection.SendCommand(Packet);
+        if (!Reply.HasValue())
+        {
+            return Reply.Error;
+        }
+
+        if (Reply.Value == "OK")
+        {
+            return DebugError::Success();
+        }
+
+        if (Reply.Value.empty())
+        {
+            return DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"Remote target does not support breakpoint deletion.");
+        }
+
+        return DebugError::Failure(
+            ErrorCode::BreakpointFailure,
+            L"Remote target rejected breakpoint deletion.");
+    }
+
+    DebugError
+        GdbRemoteTarget::RemoveBreakpointFromTarget(
+            BreakpointId Id)
+    {
+        auto It = Breakpoints.find(Id);
+        if (It == Breakpoints.end())
+        {
+            return DebugError::Failure(
+                ErrorCode::BreakpointFailure,
+                L"Breakpoint was not found.");
+        }
+
+        BreakpointInfo& Breakpoint = It->second;
+
+        if (!Breakpoint.Enabled)
+        {
+            return DebugError::Failure(
+                ErrorCode::InvalidState,
+                L"Breakpoint is disabled.");
+        }
+
+        if (!Breakpoint.Inserted)
+        {
+            return DebugError::Success();
+        }
+
+        DebugError Error = DeleteRemoteBreakpoint(
+            Breakpoint.Kind,
+            Breakpoint.Address,
+            Breakpoint.Size);
+
+        if (!Error.IsSuccess())
+        {
+            return Error;
+        }
+
+        Breakpoint.Inserted = false;
         return DebugError::Success();
     }
 
-    Result<DebugEvent>
+    DebugError
+        GdbRemoteTarget::InsertBreakpointIntoTarget(
+            BreakpointId Id)
+    {
+        auto It = Breakpoints.find(Id);
+        if (It == Breakpoints.end())
+        {
+            return DebugError::Failure(
+                ErrorCode::BreakpointFailure,
+                L"Breakpoint was not found.");
+        }
+
+        BreakpointInfo& Breakpoint = It->second;
+
+        if (!Breakpoint.Enabled)
+        {
+            return DebugError::Failure(
+                ErrorCode::InvalidState,
+                L"Breakpoint is disabled.");
+        }
+
+        if (Breakpoint.Inserted)
+        {
+            return DebugError::Success();
+        }
+
+        DebugError Error = InsertRemoteBreakpoint(
+            Breakpoint.Kind,
+            Breakpoint.Address,
+            Breakpoint.Size);
+
+        if (!Error.IsSuccess())
+        {
+            return Error;
+        }
+
+        Breakpoint.Inserted = true;
+        return DebugError::Success();
+    }
+
+    DebugError
+        GdbRemoteTarget::DeleteAllBreakpoints()
+    {
+        DebugError FirstError = DebugError::Success();
+
+        for (auto& Pair : Breakpoints)
+        {
+            BreakpointInfo& Breakpoint = Pair.second;
+
+            if (!Breakpoint.Enabled)
+            {
+                continue;
+            }
+
+            DebugError Error = DeleteRemoteBreakpoint(
+                Breakpoint.Kind,
+                Breakpoint.Address,
+                Breakpoint.Size);
+
+            if (!Error.IsSuccess())
+            {
+                if (FirstError.IsSuccess())
+                {
+                    FirstError = Error;
+                }
+
+                continue;
+            }
+
+            Breakpoint.Enabled = false;
+        }
+
+        return FirstError;
+    }
+
+    Expected<DebugEvent>
         GdbRemoteTarget::DecodeStopReply(
             const std::string& Reply) const
     {
@@ -545,7 +811,7 @@ namespace VSGDBCore
         if (Reply.empty())
         {
             Event.StopReason = DebugStopReason::Unknown;
-            return Result<DebugEvent>::Success(Event);
+            return Expected<DebugEvent>::Success(Event);
         }
 
         if (Reply[0] == 'S' || Reply[0] == 'T')
@@ -568,17 +834,17 @@ namespace VSGDBCore
 
             Event.RemoteThreadId = FindStopReplyField(Reply, "thread");
 
-            return Result<DebugEvent>::Success(Event);
+            return Expected<DebugEvent>::Success(Event);
         }
 
         if (Reply[0] == 'W' || Reply[0] == 'X')
         {
             Event.StopReason = DebugStopReason::Exited;
-            return Result<DebugEvent>::Success(Event);
+            return Expected<DebugEvent>::Success(Event);
         }
 
         Event.StopReason = DebugStopReason::Unknown;
-        return Result<DebugEvent>::Success(Event);
+        return Expected<DebugEvent>::Success(Event);
     }
 
     DebugError
@@ -589,7 +855,7 @@ namespace VSGDBCore
         Command += ThreadId;
 
         auto Reply = Connection.SendCommand(Command);
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
@@ -612,7 +878,7 @@ namespace VSGDBCore
         Command += ThreadId;
 
         auto Reply = Connection.SendCommand(Command);
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
@@ -627,14 +893,27 @@ namespace VSGDBCore
             L"GDB remote target rejected Hc thread selection.");
     }
 
-    DebugError
-        GdbRemoteTarget::SelectRegisterThreadForTest(
-            const std::string& ThreadId)
+    Expected<DebugEvent>
+        GdbRemoteTarget::GetLastEvent() const
     {
-        return SelectRegisterThread(ThreadId);
+        if (!HasLastEvent)
+        {
+            return Expected<DebugEvent>::Failure(
+                DebugError::Failure(
+                    ErrorCode::InvalidState,
+                    L"No stop event is available."));
+        }
+
+        return Expected<DebugEvent>::Success(LastEvent);
     }
 
-    Result<std::vector<DebugThreadInfo>>
+    DebugError
+        GdbRemoteTarget::BreakExecution()
+    {
+        return Connection.SendInterrupt();
+    }
+
+    Expected<std::vector<DebugThreadInfo>>
         GdbRemoteTarget::EnumerateThreads()
     {
         std::vector<std::string> RemoteThreadIds;
@@ -646,9 +925,9 @@ namespace VSGDBCore
             auto Reply = Connection.SendCommand(
                 First ? "qfThreadInfo" : "qsThreadInfo");
 
-            if (!Reply.Succeeded())
+            if (!Reply.HasValue())
             {
-                return Result<std::vector<DebugThreadInfo>>::Failure(
+                return Expected<std::vector<DebugThreadInfo>>::Failure(
                     Reply.Error);
             }
 
@@ -661,7 +940,7 @@ namespace VSGDBCore
 
             if (Reply.Value.empty())
             {
-                return Result<std::vector<DebugThreadInfo>>::Failure(
+                return Expected<std::vector<DebugThreadInfo>>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"GDB remote target returned an empty thread-list reply."));
@@ -669,7 +948,7 @@ namespace VSGDBCore
 
             if (Reply.Value[0] != 'm')
             {
-                return Result<std::vector<DebugThreadInfo>>::Failure(
+                return Expected<std::vector<DebugThreadInfo>>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"GDB remote target returned an invalid thread-list reply."));
@@ -705,19 +984,19 @@ namespace VSGDBCore
             Threads.push_back(Thread);
         }
 
-        return Result<std::vector<DebugThreadInfo>>::Success(Threads);
+        return Expected<std::vector<DebugThreadInfo>>::Success(Threads);
     }
 
-    Result<std::string>
+    Expected<std::string>
         GdbRemoteTarget::GetRemoteThreadIdFromCpuId(
             U32 CpuId)
     {
         if (Threads.empty())
         {
             auto ThreadResult = EnumerateThreads();
-            if (!ThreadResult.Succeeded())
+            if (!ThreadResult.HasValue())
             {
-                return Result<std::string>::Failure(ThreadResult.Error);
+                return Expected<std::string>::Failure(ThreadResult.Error);
             }
 
             Threads = ThreadResult.Value;
@@ -727,17 +1006,17 @@ namespace VSGDBCore
         {
             if (Thread.CpuId == CpuId)
             {
-                return Result<std::string>::Success(Thread.RemoteThreadId);
+                return Expected<std::string>::Success(Thread.RemoteThreadId);
             }
         }
 
-        return Result<std::string>::Failure(
+        return Expected<std::string>::Failure(
             DebugError::Failure(
                 ErrorCode::InvalidArgument,
                 L"CPU ID does not exist in GDB thread list."));
     }
 
-    Result<std::string>
+    Expected<std::string>
         GdbRemoteTarget::ReadTargetXml()
     {
         std::string Xml;
@@ -756,14 +1035,14 @@ namespace VSGDBCore
                 ChunkSize);
 
             auto Reply = Connection.SendCommand(Command);
-            if (!Reply.Succeeded())
+            if (!Reply.HasValue())
             {
-                return Result<std::string>::Failure(Reply.Error);
+                return Expected<std::string>::Failure(Reply.Error);
             }
 
             if (Reply.Value.empty())
             {
-                return Result<std::string>::Failure(
+                return Expected<std::string>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"Empty qXfer target.xml reply."));
@@ -773,7 +1052,7 @@ namespace VSGDBCore
 
             if (Kind != 'm' && Kind != 'l')
             {
-                return Result<std::string>::Failure(
+                return Expected<std::string>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"Invalid qXfer target.xml reply."));
@@ -789,18 +1068,18 @@ namespace VSGDBCore
             Offset += ChunkSize;
         }
 
-        return Result<std::string>::Success(Xml);
+        return Expected<std::string>::Success(Xml);
     }
 
-    Result<U64>
+    Expected<U64>
         GdbRemoteTarget::ReadRegisterByName(
             U32 CpuId,
             const std::string& Name)
     {
         DebugError DescriptionError = EnsureTargetDescriptionLoaded();
-        if (!DescriptionError.Succeeded())
+        if (!DescriptionError.IsSuccess())
         {
-            return Result<U64>::Failure(DescriptionError);
+            return Expected<U64>::Failure(DescriptionError);
         }
 
         const RegisterDescriptor* Descriptor =
@@ -808,22 +1087,22 @@ namespace VSGDBCore
 
         if (!Descriptor)
         {
-            return Result<U64>::Failure(
+            return Expected<U64>::Failure(
                 DebugError::Failure(
                     ErrorCode::InvalidArgument,
                     L"Register was not found in target description."));
         }
 
         auto ThreadId = GetRemoteThreadIdFromCpuId(CpuId);
-        if (!ThreadId.Succeeded())
+        if (!ThreadId.HasValue())
         {
-            return Result<U64>::Failure(ThreadId.Error);
+            return Expected<U64>::Failure(ThreadId.Error);
         }
 
         DebugError SelectError = SelectRegisterThread(ThreadId.Value);
-        if (!SelectError.Succeeded())
+        if (!SelectError.IsSuccess())
         {
-            return Result<U64>::Failure(SelectError);
+            return Expected<U64>::Failure(SelectError);
         }
 
         char Command[32]{};
@@ -834,14 +1113,14 @@ namespace VSGDBCore
             Descriptor->Number);
 
         auto Reply = Connection.SendCommand(Command);
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
-            return Result<U64>::Failure(Reply.Error);
+            return Expected<U64>::Failure(Reply.Error);
         }
 
         if (Reply.Value.empty() || Reply.Value[0] == 'E')
         {
-            return Result<U64>::Failure(
+            return Expected<U64>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"GDB remote target failed to read register."));
@@ -852,7 +1131,7 @@ namespace VSGDBCore
             Descriptor->BitSize);
     }
 
-    Result<std::string>
+    Expected<std::string>
         GdbRemoteTarget::ReadTargetDescriptionFile(
             const std::string& FileName)
     {
@@ -873,14 +1152,14 @@ namespace VSGDBCore
                 ChunkSize);
 
             auto Reply = Connection.SendCommand(Command);
-            if (!Reply.Succeeded())
+            if (!Reply.HasValue())
             {
-                return Result<std::string>::Failure(Reply.Error);
+                return Expected<std::string>::Failure(Reply.Error);
             }
 
             if (Reply.Value.empty())
             {
-                return Result<std::string>::Failure(
+                return Expected<std::string>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"Empty qXfer features reply."));
@@ -888,7 +1167,7 @@ namespace VSGDBCore
 
             if (Reply.Value[0] == 'E')
             {
-                return Result<std::string>::Failure(
+                return Expected<std::string>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"qXfer features read failed."));
@@ -898,7 +1177,7 @@ namespace VSGDBCore
 
             if (Kind != 'm' && Kind != 'l')
             {
-                return Result<std::string>::Failure(
+                return Expected<std::string>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"Invalid qXfer features reply."));
@@ -908,7 +1187,7 @@ namespace VSGDBCore
 
             if (ChunkData.empty() && Kind == 'm')
             {
-                return Result<std::string>::Failure(
+                return Expected<std::string>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"qXfer features returned empty intermediate chunk."));
@@ -924,30 +1203,30 @@ namespace VSGDBCore
             Offset += static_cast<U32>(ChunkData.size());
         }
 
-        return Result<std::string>::Success(Xml);
+        return Expected<std::string>::Success(Xml);
     }
 
-    Result<RegisterDescriptorSet>
+    Expected<RegisterDescriptorSet>
         GdbRemoteTarget::ReadTargetDescriptionTree(
             const std::string& FileName,
             std::set<std::string>& VisitedFiles)
     {
         if (VisitedFiles.find(FileName) != VisitedFiles.end())
         {
-            return Result<RegisterDescriptorSet>::Success(
+            return Expected<RegisterDescriptorSet>::Success(
                 RegisterDescriptorSet{});
         }
 
         VisitedFiles.insert(FileName);
 
         auto Xml = ReadTargetDescriptionFile(FileName);
-        if (!Xml.Succeeded())
+        if (!Xml.HasValue())
         {
-            return Result<RegisterDescriptorSet>::Failure(Xml.Error);
+            return Expected<RegisterDescriptorSet>::Failure(Xml.Error);
         }
 
         auto Parsed = ParseGdbTargetDescription(Xml.Value);
-        if (!Parsed.Succeeded())
+        if (!Parsed.HasValue())
         {
             return Parsed;
         }
@@ -963,7 +1242,7 @@ namespace VSGDBCore
                 Include,
                 VisitedFiles);
 
-            if (!Child.Succeeded())
+            if (!Child.HasValue())
             {
                 return Child;
             }
@@ -973,7 +1252,7 @@ namespace VSGDBCore
                 Child.Value);
         }
 
-        return Result<RegisterDescriptorSet>::Success(Combined);
+        return Expected<RegisterDescriptorSet>::Success(Combined);
     }
 
     DebugError
@@ -990,7 +1269,7 @@ namespace VSGDBCore
             "target.xml",
             VisitedFiles);
 
-        if (!Description.Succeeded())
+        if (!Description.HasValue())
         {
             return Description.Error;
         }
@@ -1015,7 +1294,7 @@ namespace VSGDBCore
         auto Reply = Connection.SendCommand(
             Enabled ? "Qqemu.PhyMemMode:1" : "Qqemu.PhyMemMode:0");
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
             return Reply.Error;
         }
@@ -1044,14 +1323,14 @@ namespace VSGDBCore
             L"Unexpected reply to physical memory mode command.");
     }
 
-    Result<ByteVector>
+    Expected<ByteVector>
         GdbRemoteTarget::ReadMemoryUsingGdbM(
             U64 Address,
             U32 Size)
     {
         if (Size == 0)
         {
-            return Result<ByteVector>::Success(ByteVector{});
+            return Expected<ByteVector>::Success(ByteVector{});
         }
 
         char Command[64]{};
@@ -1064,14 +1343,14 @@ namespace VSGDBCore
 
         auto Reply = Connection.SendCommand(Command);
 
-        if (!Reply.Succeeded())
+        if (!Reply.HasValue())
         {
-            return Result<ByteVector>::Failure(Reply.Error);
+            return Expected<ByteVector>::Failure(Reply.Error);
         }
 
         if (!Reply.Value.empty() && Reply.Value[0] == 'E')
         {
-            return Result<ByteVector>::Failure(
+            return Expected<ByteVector>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"GDB remote target failed to read memory."));

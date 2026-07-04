@@ -17,6 +17,7 @@ namespace VSGDBCore
         RegisterWriteFailure,
         BreakpointFailure,
         NotSupported,
+        InvalidState,
         InternalError
     };
 
@@ -26,7 +27,7 @@ namespace VSGDBCore
         std::wstring Message;
         U32 NativeCode = 0;
 
-        bool Succeeded() const
+        bool IsSuccess() const
         {
             return Code == ErrorCode::Success;
         }
@@ -50,27 +51,27 @@ namespace VSGDBCore
     };
 
     template <typename TValue>
-    struct Result
+    struct Expected
     {
         TValue Value {};
         DebugError Error;
 
-        bool Succeeded() const
+        bool HasValue() const
         {
-            return Error.Succeeded();
+            return Error.IsSuccess();
         }
 
-        static Result<TValue> Success(TValue Value)
+        static Expected<TValue> Success(TValue Value)
         {
-            Result<TValue> ResultValue;
+            Expected<TValue> ResultValue;
             ResultValue.Value = std::move(Value);
             ResultValue.Error = DebugError::Success();
             return ResultValue;
         }
 
-        static Result<TValue> Failure(DebugError Error)
+        static Expected<TValue> Failure(DebugError Error)
         {
-            Result<TValue> ResultValue;
+            Expected<TValue> ResultValue;
             ResultValue.Error = std::move(Error);
             return ResultValue;
         }

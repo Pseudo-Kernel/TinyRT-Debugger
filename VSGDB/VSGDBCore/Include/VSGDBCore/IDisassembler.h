@@ -33,7 +33,7 @@ namespace VSGDBCore
         virtual DebugError SetArchitecture(
             ProcessorArchitecture Architecture) = 0;
 
-        virtual Result<std::vector<DisassembledInstruction>> Disassemble(
+        virtual Expected<std::vector<DisassembledInstruction>> Disassemble(
             U64 Address,
             const ByteVector& Bytes,
             U32 MaxInstructionCount) = 0;

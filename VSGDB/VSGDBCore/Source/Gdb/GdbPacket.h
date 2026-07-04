@@ -21,6 +21,6 @@ namespace VSGDBCore
     std::string EncodeHexBytes(
         const ByteVector& Bytes);
 
-    Result<ByteVector> DecodeHexBytes(
+    Expected<ByteVector> DecodeHexBytes(
         const std::string& HexText);
 }

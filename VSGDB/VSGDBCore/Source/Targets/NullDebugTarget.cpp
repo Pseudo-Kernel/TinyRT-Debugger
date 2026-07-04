@@ -48,23 +48,23 @@ namespace VSGDBCore
                 L"Debug target is not available.");
         }
 
-        Result<DebugEvent> WaitForEvent(
+        Expected<DebugEvent> WaitForEvent(
             U32 TimeoutMilliseconds) override
         {
             (void)TimeoutMilliseconds;
 
-            return Result<DebugEvent>::Failure(
+            return Expected<DebugEvent>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));
         }
 
-        Result<RegisterContext> GetRegisters(
+        Expected<RegisterContext> GetRegisters(
             U32 CpuId) override
         {
             (void)CpuId;
 
-            return Result<RegisterContext>::Failure(
+            return Expected<RegisterContext>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));
@@ -84,7 +84,7 @@ namespace VSGDBCore
                 L"Debug target is not available.");
         }
 
-        Result<ByteVector> ReadVirtualMemory(
+        Expected<ByteVector> ReadVirtualMemory(
             U32 CpuId,
             U64 Address,
             U32 Size) override
@@ -93,7 +93,7 @@ namespace VSGDBCore
             (void)Address;
             (void)Size;
 
-            return Result<ByteVector>::Failure(
+            return Expected<ByteVector>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));
@@ -113,14 +113,14 @@ namespace VSGDBCore
                 L"Debug target is not available.");
         }
 
-        Result<ByteVector> ReadPhysicalMemory(
+        Expected<ByteVector> ReadPhysicalMemory(
             U64 Address,
             U32 Size) override
         {
             (void)Address;
             (void)Size;
 
-            return Result<ByteVector>::Failure(
+            return Expected<ByteVector>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));
@@ -138,7 +138,7 @@ namespace VSGDBCore
                 L"Debug target is not available.");
         }
 
-        Result<BreakpointId> SetBreakpoint(
+        Expected<BreakpointId> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) override
@@ -147,7 +147,7 @@ namespace VSGDBCore
             (void)Address;
             (void)Size;
 
-            return Result<BreakpointId>::Failure(
+            return Expected<BreakpointId>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));
@@ -163,10 +163,10 @@ namespace VSGDBCore
                 L"Debug target is not available.");
         }
 
-        Result<std::vector<DebugThreadInfo>>
+        Expected<std::vector<DebugThreadInfo>>
             EnumerateThreads() override
         {
-            return Result<std::vector<DebugThreadInfo>>::Failure(
+            return Expected<std::vector<DebugThreadInfo>>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));

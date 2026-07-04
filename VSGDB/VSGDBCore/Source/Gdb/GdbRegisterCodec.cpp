@@ -80,7 +80,7 @@ namespace VSGDBCore
         return true;
     }
 
-    Result<RegisterContext>
+    Expected<RegisterContext>
         DecodeX64GdbRegisters(
             const std::string& HexText)
     {
@@ -124,7 +124,7 @@ namespace VSGDBCore
 
         if (HexText.size() < RequiredHexLength)
         {
-            return Result<RegisterContext>::Failure(
+            return Expected<RegisterContext>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"GDB register packet is too short."));
@@ -166,7 +166,7 @@ namespace VSGDBCore
             !ReadLittleEndianU32FromHex(HexText, Offset, Fs) ||
             !ReadLittleEndianU32FromHex(HexText, Offset, Gs))
         {
-            return Result<RegisterContext>::Failure(
+            return Expected<RegisterContext>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"Failed to decode GDB register packet."));
@@ -180,17 +180,17 @@ namespace VSGDBCore
         Context.Fs = Fs;
         Context.Gs = Gs;
 
-        return Result<RegisterContext>::Success(Context);
+        return Expected<RegisterContext>::Success(Context);
     }
 
-    Result<U64>
+    Expected<U64>
         DecodeGdbRegisterValueToU64(
             const std::string& HexText,
             U32 BitSize)
     {
         if (BitSize == 0 || BitSize > 64)
         {
-            return Result<U64>::Failure(
+            return Expected<U64>::Failure(
                 DebugError::Failure(
                     ErrorCode::InvalidArgument,
                     L"Unsupported register bit size."));
@@ -201,7 +201,7 @@ namespace VSGDBCore
 
         if (HexText.size() < RequiredHexLength)
         {
-            return Result<U64>::Failure(
+            return Expected<U64>::Failure(
                 DebugError::Failure(
                     ErrorCode::BackendFailure,
                     L"GDB register value is too short."));
@@ -216,7 +216,7 @@ namespace VSGDBCore
 
             if (!DecodeHexByteAt(HexText, Offset, Byte))
             {
-                return Result<U64>::Failure(
+                return Expected<U64>::Failure(
                     DebugError::Failure(
                         ErrorCode::BackendFailure,
                         L"Invalid GDB register hex value."));
@@ -226,6 +226,6 @@ namespace VSGDBCore
             Offset += 2;
         }
 
-        return Result<U64>::Success(Value);
+        return Expected<U64>::Success(Value);
     }
 }

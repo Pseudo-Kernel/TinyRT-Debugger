@@ -20,7 +20,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Include\VSGDBCore\BreakpointTypes.h" />
+    <ClInclude Include="Include\VSGDBCore\Components.h" />
     <ClInclude Include="Include\VSGDBCore\DebugSession.h" />
+    <ClInclude Include="Include\VSGDBCore\DisassemblyTypes.h" />
     <ClInclude Include="Include\VSGDBCore\GdbRemoteConnection.h" />
     <ClInclude Include="Include\VSGDBCore\GdbRemoteTarget.h" />
     <ClInclude Include="Include\VSGDBCore\IAssembler.h" />
@@ -43,14 +45,20 @@
     <ClInclude Include="Include\VSGDBCore\X64Paging.h" />
     <ClInclude Include="Include\VSGDBCore\_DebugSessionConfig.h" />
     <ClInclude Include="Include\VSGDBCore\_IDebugEventSink.h" />
+    <ClInclude Include="Source\Disassembly\ZydisDisassembler.h" />
     <ClInclude Include="Source\Gdb\GdbPacket.h" />
     <ClInclude Include="Source\Gdb\GdbRegisterCodec.h" />
     <ClInclude Include="Source\Gdb\GdbTargetDescription.h" />
+    <ClInclude Include="Source\Modules\ModuleManager.h" />
+    <ClInclude Include="Source\Symbols\DiaSymbolManager.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\External\Zydis\Zydis.c" />
+    <ClCompile Include="Source\Components.cpp" />
     <ClCompile Include="Source\Core\DebugSession.cpp" />
     <ClCompile Include="Source\Disassembly\NullAssembler.cpp" />
     <ClCompile Include="Source\Disassembly\NullDisassembler.cpp" />
+    <ClCompile Include="Source\Disassembly\ZydisDisassembler.cpp" />
     <ClCompile Include="Source\Expressions\SimpleExpressionEvaluator.cpp" />
     <ClCompile Include="Source\Gdb\GdbPacket.cpp" />
     <ClCompile Include="Source\Gdb\GdbRegisterCodec.cpp" />
@@ -59,6 +67,7 @@
     <ClCompile Include="Source\Gdb\GdbTargetDescription.cpp" />
     <ClCompile Include="Source\Modules\ModuleManager.cpp" />
     <ClCompile Include="Source\Paging\X64Paging.cpp" />
+    <ClCompile Include="Source\Symbols\DiaSymbolManager.cpp" />
     <ClCompile Include="Source\Symbols\NullSymbolManager.cpp" />
     <ClCompile Include="Source\Targets\NullDebugTarget.cpp" />
   </ItemGroup>
@@ -116,15 +125,19 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -135,6 +148,8 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -153,6 +168,8 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -169,6 +186,8 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -187,6 +206,8 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>

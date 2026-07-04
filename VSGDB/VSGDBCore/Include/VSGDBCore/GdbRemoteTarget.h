@@ -25,10 +25,10 @@ namespace VSGDBCore
 
         DebugError StepInto(U32 CpuId) override;
 
-        Result<DebugEvent> WaitForEvent(
+        Expected<DebugEvent> WaitForEvent(
             U32 TimeoutMilliseconds) override;
 
-        Result<RegisterContext> GetRegisters(
+        Expected<RegisterContext> GetRegisters(
             U32 CpuId) override;
 
         DebugError SetRegister(
@@ -36,17 +36,22 @@ namespace VSGDBCore
             const std::wstring& Name,
             U64 Value) override;
 
-        Result<ByteVector> ReadVirtualMemory(
+        Expected<ByteVector> ReadVirtualMemory(
             U32 CpuId,
             U64 Address,
             U32 Size) override;
+
+        Expected<ByteVector> ReadVirtualMemorySingle(
+            U32 CpuId,
+            U64 Address,
+            U32 Size);
 
         DebugError WriteVirtualMemory(
             U32 CpuId,
             U64 Address,
             const ByteVector& Bytes) override;
 
-        Result<ByteVector> ReadPhysicalMemory(
+        Expected<ByteVector> ReadPhysicalMemory(
             U64 Address,
             U32 Size) override;
 
@@ -54,7 +59,7 @@ namespace VSGDBCore
             U64 Address,
             const ByteVector& Bytes) override;
 
-        Result<BreakpointId> SetBreakpoint(
+        Expected<BreakpointId> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) override;
@@ -62,15 +67,37 @@ namespace VSGDBCore
         DebugError DeleteBreakpoint(
             BreakpointId Id) override;
 
-        Result<std::vector<DebugThreadInfo>> EnumerateThreads() override;
+        DebugError DeleteBreakpointByAddress(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size);
 
-    public:
-        DebugError
-            SelectRegisterThreadForTest(
-                const std::string& ThreadId);
+        DebugError InsertRemoteBreakpoint(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size);
+
+        DebugError DeleteRemoteBreakpoint(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size);
+
+        DebugError RemoveBreakpointFromTarget(
+            BreakpointId Id);
+
+        DebugError InsertBreakpointIntoTarget(
+            BreakpointId Id);
+
+        DebugError DeleteAllBreakpoints();
+
+        Expected<std::vector<DebugThreadInfo>> EnumerateThreads() override;
+
+        Expected<DebugEvent> GetLastEvent() const;
+
+        DebugError BreakExecution();
 
     private:
-        Result<DebugEvent> DecodeStopReply(
+        Expected<DebugEvent> DecodeStopReply(
             const std::string& Reply) const;
 
         DebugError SelectRegisterThread(
@@ -79,22 +106,22 @@ namespace VSGDBCore
         DebugError SelectContinueThread(
             const std::string& ThreadId);
 
-        Result<std::string> GetRemoteThreadIdFromCpuId(
+        Expected<std::string> GetRemoteThreadIdFromCpuId(
             U32 CpuId);
 
     private:
-        Result<std::string> ReadTargetXml();
+        Expected<std::string> ReadTargetXml();
 
-        Result<std::string> ReadTargetDescriptionFile(
+        Expected<std::string> ReadTargetDescriptionFile(
             const std::string& FileName);
 
-        Result<RegisterDescriptorSet> ReadTargetDescriptionTree(
+        Expected<RegisterDescriptorSet> ReadTargetDescriptionTree(
             const std::string& FileName,
             std::set<std::string>& VisitedFiles);
 
         DebugError EnsureTargetDescriptionLoaded();
 
-        Result<U64> ReadRegisterByName(
+        Expected<U64> ReadRegisterByName(
             U32 CpuId,
             const std::string& Name);
 
@@ -102,7 +129,7 @@ namespace VSGDBCore
         DebugError SetQemuPhysicalMemoryMode(
             bool Enabled);
 
-        Result<ByteVector> ReadMemoryUsingGdbM(
+        Expected<ByteVector> ReadMemoryUsingGdbM(
             U64 Address,
             U32 Size);
 
