@@ -2,6 +2,8 @@
 
 #include "Disassembly/ZydisDisassembler.h"
 #include "Modules/ModuleManager.h"
+#include "Symbols/DiaSymbolManager.h"
+#include "Symbols/NullSymbolManager.h"
 
 namespace VSGDBCore
 {
@@ -17,4 +19,15 @@ namespace VSGDBCore
         return std::make_unique<ModuleManager>();
     }
 
+    std::unique_ptr<ISymbolManager>
+        CreateDefaultSymbolManager()
+    {
+        return std::make_unique<DiaSymbolManager>();
+    }
+
+    std::unique_ptr<ISymbolManager>
+        CreateNullSymbolManager()
+    {
+        return std::make_unique<NullSymbolManager>();
+    }
 }

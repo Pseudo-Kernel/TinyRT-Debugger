@@ -51,6 +51,7 @@
     <ClInclude Include="Source\Gdb\GdbTargetDescription.h" />
     <ClInclude Include="Source\Modules\ModuleManager.h" />
     <ClInclude Include="Source\Symbols\DiaSymbolManager.h" />
+    <ClInclude Include="Source\Symbols\NullSymbolManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\External\Zydis\Zydis.c" />
@@ -124,20 +125,24 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Include;$(VSInstallDir)DIA SDK\include;$(IncludePath)</IncludePath>
     <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Include;$(VSInstallDir)DIA SDK\include;$(IncludePath)</IncludePath>
     <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Include;$(VSInstallDir)DIA SDK\include;$(IncludePath)</IncludePath>
     <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib\amd64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Include;$(VSInstallDir)DIA SDK\include;$(IncludePath)</IncludePath>
     <ExternalIncludePath>$(SolutionDir)External\Zydis;$(ExternalIncludePath)</ExternalIncludePath>
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib\amd64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

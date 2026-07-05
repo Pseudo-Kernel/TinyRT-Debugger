@@ -21,6 +21,31 @@ PrintInstructionBytes(
     }
 }
 
+static std::wstring
+FormatBranchTargetAnnotation(
+    const VSGDBCore::DisassembledInstruction& Instruction,
+    const AddressFormatter& FormatAddress)
+{
+    if (!Instruction.HasBranchTarget || !FormatAddress)
+    {
+        return {};
+    }
+
+    const AddressLabel Label =
+        FormatAddress(Instruction.BranchTarget);
+
+    if (Label.Text.empty())
+    {
+        return {};
+    }
+
+    std::wstring Text = L" <";
+    Text += Label.Text;
+    Text += L">";
+
+    return Text;
+}
+
 void
 PrintDisassembly(
     const std::vector<VSGDBCore::DisassembledInstruction>& Instructions,
@@ -68,8 +93,14 @@ PrintDisassembly(
             std::wprintf(L"   ");
         }
 
+        const std::wstring BranchAnnotation =
+            FormatBranchTargetAnnotation(
+                Instruction,
+                FormatAddress);
+
         std::wprintf(
-            L" %s\n",
-            Instruction.Text.c_str());
+            L" %s%s\n",
+            Instruction.Text.c_str(),
+            BranchAnnotation.c_str());
     }
 }

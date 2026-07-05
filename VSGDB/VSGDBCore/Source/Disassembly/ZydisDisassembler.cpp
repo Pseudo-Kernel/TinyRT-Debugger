@@ -55,6 +55,62 @@ namespace VSGDBCore
         OutOperands = Text.substr(OperandStart);
     }
 
+    static bool
+        TryGetBranchTarget(
+            const ZydisDecodedInstruction& Instruction,
+            const ZydisDecodedOperand* Operands,
+            VSGDBCore::U64 RuntimeAddress,
+            VSGDBCore::U64* OutTarget)
+    {
+        if (OutTarget == nullptr)
+        {
+            return false;
+        }
+
+        if (Instruction.meta.category != ZYDIS_CATEGORY_COND_BR &&
+            Instruction.meta.category != ZYDIS_CATEGORY_UNCOND_BR &&
+            Instruction.meta.category != ZYDIS_CATEGORY_CALL)
+        {
+            return false;
+        }
+
+        for (ZyanU8 Index = 0;
+            Index < Instruction.operand_count_visible;
+            ++Index)
+        {
+            const ZydisDecodedOperand& Operand = Operands[Index];
+
+            if (Operand.type != ZYDIS_OPERAND_TYPE_IMMEDIATE)
+            {
+                continue;
+            }
+
+            if (!Operand.imm.is_relative)
+            {
+                continue;
+            }
+
+            ZyanU64 AbsoluteAddress = 0;
+
+            const ZyanStatus Status =
+                ZydisCalcAbsoluteAddress(
+                    &Instruction,
+                    &Operand,
+                    RuntimeAddress,
+                    &AbsoluteAddress);
+
+            if (!ZYAN_SUCCESS(Status))
+            {
+                return false;
+            }
+
+            *OutTarget = static_cast<VSGDBCore::U64>(AbsoluteAddress);
+            return true;
+        }
+
+        return false;
+    }
+
     ZydisDisassembler::ZydisDisassembler()
     {
         (void)SetArchitecture(ProcessorArchitecture::X64);
@@ -206,6 +262,18 @@ namespace VSGDBCore
                 Instruction.Mnemonic = L"<format>";
                 Instruction.Operands = L"failed";
                 Instruction.Text = L"<format failed>";
+            }
+
+            VSGDBCore::U64 BranchTarget = 0;
+
+            if (TryGetBranchTarget(
+                DecodedInstruction,
+                DecodedOperands,
+                CurrentAddress,
+                &BranchTarget))
+            {
+                Instruction.HasBranchTarget = true;
+                Instruction.BranchTarget = BranchTarget;
             }
 
             Instructions.push_back(std::move(Instruction));

@@ -5,6 +5,9 @@
 #include "ModuleTypes.h"
 #include "SymbolTypes.h"
 
+#include <string>
+#include <vector>
+
 namespace VSGDBCore
 {
     class ISymbolManager
@@ -12,23 +15,22 @@ namespace VSGDBCore
     public:
         virtual ~ISymbolManager() = default;
 
-        virtual DebugError LoadSymbols(
+        virtual DebugError LoadSymbolsForModule(
             const ModuleInfo& Module) = 0;
 
-        virtual DebugError UnloadSymbols(
-            const std::wstring& ModuleName) = 0;
+        virtual DebugError UnloadSymbolsForModule(
+            ModuleId ModuleId) = 0;
 
-        virtual Expected<ResolvedSymbol> GetNearestSymbol(
+        virtual Expected<SymbolInfo> GetSymbolByAddress(
             U64 Address) const = 0;
 
-        virtual Expected<ResolvedSymbol> AddressToSymbol(
+        virtual Expected<SymbolInfo> GetSymbolByName(
+            const std::wstring& Name) const = 0;
+
+        virtual Expected<SourceLocation> GetSourceLocationByAddress(
             U64 Address) const = 0;
 
-        virtual Expected<SourceLocation> AddressToSourceLine(
-            U64 Address) const = 0;
-
-        virtual Expected<std::vector<U64>> SourceLineToAddress(
-            const std::wstring& FilePath,
-            U32 Line) const = 0;
+        virtual Expected<std::vector<SymbolInfo>> EnumerateSymbols(
+            ModuleId ModuleId) const = 0;
     };
 }

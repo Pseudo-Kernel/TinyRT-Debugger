@@ -6,6 +6,7 @@
 #include "MemoryPrinter.h"
 #include "PagingPrinter.h"
 #include "PageFaultPrinter.h"
+#include "SymbolQuery.h"
 
 #include <VSGDBCore/X64Paging.h>
 #include <cstdio>
@@ -13,6 +14,15 @@
 #include <sstream>
 #include <iostream>
 #include <Windows.h>
+
+static constexpr VSGDBCore::U32 DefaultDisassemblyBytes = 0x80;
+static constexpr VSGDBCore::U32 MaxDisassemblyBytes = 0x1000;
+
+static constexpr VSGDBCore::U32 DefaultFunctionDisassemblyBytes = 0x100;
+static constexpr VSGDBCore::U32 MaxFunctionDisassemblyBytes = 0x1000;
+
+static constexpr size_t MaxSymbolSearchResults = 256;
+
 
 static std::wstring
 ToLower(
@@ -63,112 +73,6 @@ ParseU32(
 
     OutValue = static_cast<VSGDBCore::U32>(Value);
     return true;
-}
-
-static void
-PrintRegister(
-    const char* Name,
-    VSGDBCore::U64 Value)
-{
-    std::printf(
-        "%-8s = 0x%016llx\n",
-        Name,
-        Value);
-}
-
-static void
-PrintRegisters(
-    const VSGDBCore::RegisterContext& Context)
-{
-    PrintRegister("RAX", Context.Rax);
-    PrintRegister("RBX", Context.Rbx);
-    PrintRegister("RCX", Context.Rcx);
-    PrintRegister("RDX", Context.Rdx);
-    PrintRegister("RSI", Context.Rsi);
-    PrintRegister("RDI", Context.Rdi);
-    PrintRegister("RBP", Context.Rbp);
-    PrintRegister("RSP", Context.Rsp);
-
-    PrintRegister("R8", Context.R8);
-    PrintRegister("R9", Context.R9);
-    PrintRegister("R10", Context.R10);
-    PrintRegister("R11", Context.R11);
-    PrintRegister("R12", Context.R12);
-    PrintRegister("R13", Context.R13);
-    PrintRegister("R14", Context.R14);
-    PrintRegister("R15", Context.R15);
-
-    PrintRegister("RIP", Context.Rip);
-    PrintRegister("RFLAGS", Context.Rflags);
-
-    PrintRegister("CS", Context.Cs);
-    PrintRegister("SS", Context.Ss);
-    PrintRegister("DS", Context.Ds);
-    PrintRegister("ES", Context.Es);
-    PrintRegister("FS", Context.Fs);
-    PrintRegister("GS", Context.Gs);
-
-    PrintRegister("FSBASE", Context.FsBase);
-    PrintRegister("GSBASE", Context.GsBase);
-    PrintRegister("KGSBASE", Context.KernelGsBase);
-
-    PrintRegister("CR0", Context.Cr0);
-    PrintRegister("CR2", Context.Cr2);
-    PrintRegister("CR3", Context.Cr3);
-    PrintRegister("CR4", Context.Cr4);
-    PrintRegister("CR8", Context.Cr8);
-    PrintRegister("EFER", Context.Efer);
-}
-
-static bool
-PrintRegisterByName(
-    const VSGDBCore::RegisterContext& Context,
-    const std::wstring& Name)
-{
-    const std::wstring LowerName = ToLower(Name);
-
-    if (LowerName == L"rax") { PrintRegister("RAX", Context.Rax); return true; }
-    if (LowerName == L"rbx") { PrintRegister("RBX", Context.Rbx); return true; }
-    if (LowerName == L"rcx") { PrintRegister("RCX", Context.Rcx); return true; }
-    if (LowerName == L"rdx") { PrintRegister("RDX", Context.Rdx); return true; }
-
-    if (LowerName == L"rsi") { PrintRegister("RSI", Context.Rsi); return true; }
-    if (LowerName == L"rdi") { PrintRegister("RDI", Context.Rdi); return true; }
-    if (LowerName == L"rbp") { PrintRegister("RBP", Context.Rbp); return true; }
-    if (LowerName == L"rsp") { PrintRegister("RSP", Context.Rsp); return true; }
-
-    if (LowerName == L"r8") { PrintRegister("R8", Context.R8);  return true; }
-    if (LowerName == L"r9") { PrintRegister("R9", Context.R9);  return true; }
-    if (LowerName == L"r10") { PrintRegister("R10", Context.R10); return true; }
-    if (LowerName == L"r11") { PrintRegister("R11", Context.R11); return true; }
-    if (LowerName == L"r12") { PrintRegister("R12", Context.R12); return true; }
-    if (LowerName == L"r13") { PrintRegister("R13", Context.R13); return true; }
-    if (LowerName == L"r14") { PrintRegister("R14", Context.R14); return true; }
-    if (LowerName == L"r15") { PrintRegister("R15", Context.R15); return true; }
-
-    if (LowerName == L"rip") { PrintRegister("RIP", Context.Rip);    return true; }
-    if (LowerName == L"rflags") { PrintRegister("RFLAGS", Context.Rflags); return true; }
-    if (LowerName == L"eflags") { PrintRegister("RFLAGS", Context.Rflags); return true; }
-
-    if (LowerName == L"cs") { PrintRegister("CS", Context.Cs); return true; }
-    if (LowerName == L"ss") { PrintRegister("SS", Context.Ss); return true; }
-    if (LowerName == L"ds") { PrintRegister("DS", Context.Ds); return true; }
-    if (LowerName == L"es") { PrintRegister("ES", Context.Es); return true; }
-    if (LowerName == L"fs") { PrintRegister("FS", Context.Fs); return true; }
-    if (LowerName == L"gs") { PrintRegister("GS", Context.Gs); return true; }
-
-    if (LowerName == L"fsbase") { PrintRegister("FSBASE", Context.FsBase);       return true; }
-    if (LowerName == L"gsbase") { PrintRegister("GSBASE", Context.GsBase);       return true; }
-    if (LowerName == L"kgsbase") { PrintRegister("KGSBASE", Context.KernelGsBase); return true; }
-
-    if (LowerName == L"cr0") { PrintRegister("CR0", Context.Cr0);  return true; }
-    if (LowerName == L"cr2") { PrintRegister("CR2", Context.Cr2);  return true; }
-    if (LowerName == L"cr3") { PrintRegister("CR3", Context.Cr3);  return true; }
-    if (LowerName == L"cr4") { PrintRegister("CR4", Context.Cr4);  return true; }
-    if (LowerName == L"cr8") { PrintRegister("CR8", Context.Cr8);  return true; }
-    if (LowerName == L"efer") { PrintRegister("EFER", Context.Efer); return true; }
-
-    return false;
 }
 
 static void
@@ -248,16 +152,69 @@ PrintDebugError(
     }
 }
 
+static std::wstring
+GetModuleDisplayNameById(
+    VSGDBCore::IModuleManager& ModuleManager,
+    VSGDBCore::ModuleId ModuleId)
+{
+    auto Module = ModuleManager.GetModuleById(ModuleId);
+
+    if (!Module.HasValue())
+    {
+        return L"?";
+    }
+
+    if (!Module.Value.Name.empty())
+    {
+        return Module.Value.Name;
+    }
+
+    if (!Module.Value.ImagePath.empty())
+    {
+        return Module.Value.ImagePath;
+    }
+
+    return L"?";
+}
+
+static bool
+StartsWithCaseInsensitive(
+    const std::wstring& Text,
+    const std::wstring& Prefix)
+{
+    if (Prefix.size() > Text.size())
+    {
+        return false;
+    }
+
+    for (size_t Index = 0; Index < Prefix.size(); ++Index)
+    {
+        if (std::towlower(Text[Index]) !=
+            std::towlower(Prefix[Index]))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 
 
 CommandProcessor::CommandProcessor(
     VSGDBCore::GdbRemoteTarget& Target,
     std::unique_ptr<VSGDBCore::IDisassembler> Disassembler,
-    std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager) :
+    std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager,
+    std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager) :
     Target(Target),
     Disassembler(std::move(Disassembler)),
-    ModuleManager(std::move(ModuleManager))
+    ModuleManager(std::move(ModuleManager)),
+    SymbolManager(std::move(SymbolManager)),
+    Formatter()
 {
+    Formatter = std::make_unique<DebugTextFormatter>(
+        this->ModuleManager.get(),
+        this->SymbolManager.get());
 }
 
 int
@@ -418,6 +375,16 @@ CommandProcessor::ExecuteCommand(
         return ExecuteDisassemble(Arguments);
     }
 
+    if (Command == L"uf")
+    {
+        return ExecuteDisassembleFunction(Arguments);
+    }
+
+    if (Command == L"ub")
+    {
+        return ExecuteDisassembleBackwardWindow(Arguments);
+    }
+
     if (Command == L"lm")
     {
         return ExecuteListModules(Arguments);
@@ -426,6 +393,21 @@ CommandProcessor::ExecuteCommand(
     if (Command == L".reload")
     {
         return ExecuteReload(Arguments);
+    }
+
+    if (Command == L".symload")
+    {
+        return ExecuteSymbolLoad(Arguments);
+    }
+
+    if (Command == L"x")
+    {
+        return ExecuteSymbol(Arguments);
+    }
+
+    if (Command == L"line")
+    {
+        return ExecuteSourceLine(Arguments);
     }
 
     std::wprintf(
@@ -461,8 +443,13 @@ CommandProcessor::ExecuteHelp(
         L"  bc *                 Clear all breakpoints known to this CLI session.\n"
         L"  bcaddr <expr>        Clear software breakpoint by address. Useful for cleanup after reconnect.\n"
         L"  u [expr] [bytes]     Disassemble instructions starting in byte range.\n"
+        L"  uf [expr]            Disassemble containing function.\n"
+        L"  ub [expr] [bytes]    Disassemble window around address using function start for alignment.\n"
         L"  lm                   List registered modules.\n"
         L"  .reload <image> <base> [size]   Register a module image at base address.\n"
+        L"  .symload <module-id>            Load symbols for registered module.\n"
+        L"  x <symbol-name|pattern>         Lookup or search symbols. Supports *, prefix*, *suffix, *contains*.\n"
+        L"  line [expr]          Show source location for address.\n"
     );
 
     return true;
@@ -593,7 +580,7 @@ CommandProcessor::ExecuteRegisters(
 
     if (Arguments.size() == 1)
     {
-        PrintRegisters(Registers.Value);
+        Formatter->PrintRegisters(Registers.Value);
         return true;
     }
 
@@ -601,7 +588,7 @@ CommandProcessor::ExecuteRegisters(
 
     for (size_t Index = 1; Index < Arguments.size(); ++Index)
     {
-        if (!PrintRegisterByName(
+        if (!Formatter->PrintRegisterByName(
             Registers.Value,
             Arguments[Index]))
         {
@@ -629,7 +616,8 @@ CommandProcessor::ExecuteDumpVirtualBytes(
     auto Address = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[1]);
+        Arguments[1],
+        SymbolManager.get());
 
     if (!Address.HasValue())
     {
@@ -666,6 +654,11 @@ CommandProcessor::ExecuteDumpVirtualBytes(
         return false;
     }
 
+    std::wprintf(
+        L"Dumping %u bytes from %s\n",
+        static_cast<VSGDBCore::U32>(Size64),
+        Formatter->FormatAddressInline(Address.Value).c_str());
+
     PrintHexDump(
         Address.Value,
         Bytes.Value);
@@ -686,7 +679,8 @@ CommandProcessor::ExecuteDumpPhysicalBytes(
     auto Address = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[1]);
+        Arguments[1],
+        SymbolManager.get());
 
     if (!Address.HasValue())
     {
@@ -742,7 +736,8 @@ CommandProcessor::ExecutePte(
     auto VirtualAddress = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[1]);
+        Arguments[1],
+        SymbolManager.get());
 
     if (!VirtualAddress.HasValue())
     {
@@ -783,7 +778,7 @@ CommandProcessor::ExecutePte(
         return false;
     }
 
-    PrintTranslation(Translation.Value);
+    Formatter->PrintTranslation(Translation.Value);
     return true;
 }
 
@@ -800,7 +795,8 @@ CommandProcessor::ExecutePageFault(
     auto VirtualAddress = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[1]);
+        Arguments[1],
+        SymbolManager.get());
 
     if (!VirtualAddress.HasValue())
     {
@@ -814,7 +810,8 @@ CommandProcessor::ExecutePageFault(
     auto ErrorCode = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[2]);
+        Arguments[2],
+        SymbolManager.get());
 
     if (!ErrorCode.HasValue())
     {
@@ -855,14 +852,14 @@ CommandProcessor::ExecutePageFault(
         return false;
     }
 
-    PrintTranslation(Translation.Value);
+    Formatter->PrintTranslation(Translation.Value);
 
     const auto Analysis = VSGDBCore::AnalyzeX64PageFault(
         Paging,
         Translation.Value,
         ErrorCode.Value);
 
-    PrintPageFaultAnalysis(Analysis);
+    Formatter->PrintPageFaultAnalysis(Analysis);
 
     return true;
 }
@@ -926,7 +923,8 @@ CommandProcessor::ExecuteBreakpointSet(
     auto Address = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[1]);
+        Arguments[1],
+        SymbolManager.get());
 
     if (!Address.HasValue())
     {
@@ -973,9 +971,9 @@ CommandProcessor::ExecuteBreakpointSet(
     Breakpoints.push_back(Breakpoint);
 
     std::wprintf(
-        L"Breakpoint %u set at 0x%016llx\n",
+        L"Breakpoint %u set at %s\n",
         Breakpoint.Id,
-        Breakpoint.Address);
+        Formatter->FormatAddressInline(Breakpoint.Address).c_str());
 
     return true;
 }
@@ -993,7 +991,7 @@ CommandProcessor::ExecuteBreakpointList(
     bool Any = false;
 
     std::wprintf(
-        L"Id  Address             Size  Kind       State\n");
+        L"Id  Address             Size  Kind       State     Symbol\n");
 
     for (const auto& Breakpoint : Breakpoints)
     {
@@ -1004,12 +1002,24 @@ CommandProcessor::ExecuteBreakpointList(
 
         Any = true;
 
+        AddressLabel Label = Formatter->FormatAddressLabel(Breakpoint.Address);
+
         std::wprintf(
-            L"%-3u 0x%016llx  %-4u  %-10s enabled\n",
+            L"%-3u 0x%016llx  %-4u %-10s %-8s",
             Breakpoint.Id,
             Breakpoint.Address,
             Breakpoint.Size,
-            BreakpointKindName(Breakpoint.Kind));
+            BreakpointKindName(Breakpoint.Kind),
+            L"enabled");
+
+        if (!Label.Text.empty())
+        {
+            std::wprintf(
+                L" %s",
+                Label.Text.c_str());
+        }
+
+        std::wprintf(L"\n");
     }
 
     if (!Any)
@@ -1171,13 +1181,10 @@ CommandProcessor::ReportStopReason(
 
     if (Breakpoint != nullptr)
     {
-        AddressLabel Label = FormatAddressWithModule(
-            Breakpoint->Address);
-
         std::wprintf(
             L"Hit breakpoint %u at %s\n",
             Breakpoint->Id,
-            Label.Text.c_str());
+            Formatter->FormatAddressInline(Breakpoint->Address).c_str());
 
         return;
     }
@@ -1253,7 +1260,8 @@ CommandProcessor::ExecuteBreakpointClearAddress(
     auto Address = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[1]);
+        Arguments[1],
+        SymbolManager.get());
 
     if (!Address.HasValue())
     {
@@ -1553,6 +1561,12 @@ CommandProcessor::ExecuteDisassemble(
         return false;
     }
 
+    if (!Disassembler)
+    {
+        std::wprintf(L"No disassembler is available.\n");
+        return false;
+    }
+
     std::wstring AddressExpression = L"rip";
 
     if (Arguments.size() >= 2)
@@ -1560,33 +1574,34 @@ CommandProcessor::ExecuteDisassemble(
         AddressExpression = Arguments[1];
     }
 
-    if (!Disassembler)
-    {
-        std::wprintf(L"No disassembler is available.\n");
-        return false;
-    }
-
     auto Address = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        AddressExpression);
+        AddressExpression,
+        SymbolManager.get());
 
     if (!Address.HasValue())
     {
         PrintDebugError(
-            L"Failed to evaluate address\n",
+            L"Failed to evaluate address",
             Address.Error);
 
         return false;
     }
 
-    VSGDBCore::U64 ByteCount64 = 0x80;
+    VSGDBCore::U64 ByteCount64 = DefaultDisassemblyBytes;
 
     if (Arguments.size() == 3)
     {
-        if (!ParseU64(Arguments[2], ByteCount64) ||
-            ByteCount64 == 0 ||
-            ByteCount64 > 0x1000)
+        auto EvalResult = EvaluateSimpleExpression(
+            Target,
+            CurrentCpuId,
+            Arguments[2],
+            nullptr);
+
+        if (!EvalResult.HasValue() ||
+            EvalResult.Value == 0 ||
+            EvalResult.Value > MaxDisassemblyBytes)
         {
             std::wprintf(
                 L"Invalid byte count: %s\n",
@@ -1594,73 +1609,219 @@ CommandProcessor::ExecuteDisassemble(
 
             return false;
         }
+
+        ByteCount64 = EvalResult.Value;
     }
 
     const VSGDBCore::U32 ByteCount =
         static_cast<VSGDBCore::U32>(ByteCount64);
 
-    constexpr VSGDBCore::U32 MaxX64InstructionLength = 15;
+    const VSGDBCore::U64 StartAddress = Address.Value;
 
-    const VSGDBCore::U32 ReadSize =
-        ByteCount + MaxX64InstructionLength;
-
-    auto Bytes = Target.ReadVirtualMemory(
-        CurrentCpuId,
-        Address.Value,
-        ReadSize);
-
-    if (!Bytes.HasValue())
+    if (StartAddress > UINT64_MAX - ByteCount)
     {
-        PrintDebugError(L"ReadVirtualMemory failed", Bytes.Error);
-        return false;
-    }
-
-    const VSGDBCore::U32 MaxInstructionCount =
-        ByteCount + MaxX64InstructionLength;
-
-    auto Instructions = Disassembler->Disassemble(
-        Address.Value,
-        Bytes.Value,
-        MaxInstructionCount);
-
-    if (!Instructions.HasValue())
-    {
-        PrintDebugError(L"Disassemble failed", Instructions.Error);
+        std::wprintf(L"Disassembly range overflows.\n");
         return false;
     }
 
     const VSGDBCore::U64 EndAddress =
-        Address.Value + ByteCount;
-
-    std::vector<VSGDBCore::DisassembledInstruction> VisibleInstructions;
-
-    for (const auto& Instruction : Instructions.Value)
-    {
-        if (Instruction.Address >= EndAddress)
-        {
-            break;
-        }
-
-        VisibleInstructions.push_back(Instruction);
-    }
+        StartAddress + ByteCount;
 
     VSGDBCore::U64 CurrentRip = 0;
 
     auto Registers = Target.GetRegisters(CurrentCpuId);
+
     if (Registers.HasValue())
     {
         CurrentRip = Registers.Value.Rip;
     }
 
-    PrintDisassembly(
-        VisibleInstructions,
+    return DisassembleRange(
+        StartAddress,
+        ByteCount,
         CurrentRip,
-        [this](VSGDBCore::U64 Address) -> AddressLabel
-        {
-            return FormatAddressWithModule(Address);
-        });
+        StartAddress,
+        EndAddress);
+}
 
-    return true;
+bool
+CommandProcessor::ExecuteDisassembleFunction(
+    const std::vector<std::wstring>& Arguments)
+{
+    if (Arguments.size() > 2)
+    {
+        std::wprintf(L"Usage: uf [expr]\n");
+        return false;
+    }
+
+    auto Registers = Target.GetRegisters(CurrentCpuId);
+
+    if (!Registers.HasValue())
+    {
+        PrintDebugError(L"Failed to read registers", Registers.Error);
+        return false;
+    }
+
+    VSGDBCore::U64 Address = Registers.Value.Rip;
+
+    if (Arguments.size() == 2)
+    {
+        auto Evaluated = EvaluateSimpleExpression(
+            Target,
+            CurrentCpuId,
+            Arguments[1],
+            SymbolManager.get());
+
+        if (!Evaluated.HasValue())
+        {
+            PrintDebugError(L"Failed to evaluate address", Evaluated.Error);
+            return false;
+        }
+
+        Address = Evaluated.Value;
+    }
+
+    if (!SymbolManager)
+    {
+        std::wprintf(L"No symbol manager is available.\n");
+        return false;
+    }
+
+    auto Symbol = SymbolManager->GetSymbolByAddress(Address);
+
+    if (!Symbol.HasValue())
+    {
+        PrintDebugError(L"Failed to find containing function", Symbol.Error);
+        return false;
+    }
+
+    VSGDBCore::U32 ByteCount = Symbol.Value.Size;
+
+    if (ByteCount == 0)
+    {
+        ByteCount = DefaultFunctionDisassemblyBytes;
+    }
+
+    if (ByteCount > MaxFunctionDisassemblyBytes)
+    {
+        ByteCount = MaxFunctionDisassemblyBytes;
+    }
+
+    VSGDBCore::U64 VisibleStart = Symbol.Value.Address;
+    VSGDBCore::U64 VisibleEnd = Symbol.Value.Address + Symbol.Value.Size;
+
+    return DisassembleRange(
+        Symbol.Value.Address,
+        ByteCount,
+        Registers.Value.Rip,
+        VisibleStart,
+        VisibleEnd);
+}
+
+bool
+CommandProcessor::ExecuteDisassembleBackwardWindow(
+    const std::vector<std::wstring>& Arguments)
+{
+    if (Arguments.size() > 3)
+    {
+        std::wprintf(L"Usage: ub [expr] [bytes]\n");
+        return false;
+    }
+
+    auto Registers = Target.GetRegisters(CurrentCpuId);
+
+    if (!Registers.HasValue())
+    {
+        PrintDebugError(L"Failed to read registers", Registers.Error);
+        return false;
+    }
+
+    VSGDBCore::U64 TargetAddress = Registers.Value.Rip;
+    VSGDBCore::U32 WindowBytes = 0x80;
+
+    if (Arguments.size() >= 2)
+    {
+        auto Evaluated = EvaluateSimpleExpression(
+            Target,
+            CurrentCpuId,
+            Arguments[1],
+            SymbolManager.get());
+
+        if (!Evaluated.HasValue())
+        {
+            PrintDebugError(L"Failed to evaluate address", Evaluated.Error);
+            return false;
+        }
+
+        TargetAddress = Evaluated.Value;
+    }
+
+    if (Arguments.size() >= 3)
+    {
+        auto EvaluatedSize = EvaluateSimpleExpression(
+            Target,
+            CurrentCpuId,
+            Arguments[2],
+            SymbolManager.get());
+
+        if (!EvaluatedSize.HasValue())
+        {
+            PrintDebugError(L"Failed to evaluate byte count", EvaluatedSize.Error);
+            return false;
+        }
+
+        if (EvaluatedSize.Value == 0 ||
+            EvaluatedSize.Value > 0x1000)
+        {
+            std::wprintf(L"Invalid byte count.\n");
+            return false;
+        }
+
+        WindowBytes = static_cast<VSGDBCore::U32>(EvaluatedSize.Value);
+    }
+
+    auto Symbol = SymbolManager->GetSymbolByAddress(TargetAddress);
+
+    if (!Symbol.HasValue())
+    {
+        PrintDebugError(L"Failed to find containing function", Symbol.Error);
+        return false;
+    }
+
+    const VSGDBCore::U64 FunctionStart = Symbol.Value.Address;
+    const VSGDBCore::U32 FunctionSize =
+        Symbol.Value.Size != 0 ? Symbol.Value.Size : 0x400;
+
+    const VSGDBCore::U64 FunctionEnd =
+        FunctionStart + FunctionSize;
+
+    VSGDBCore::U64 VisibleStart =
+        TargetAddress > WindowBytes / 2
+        ? TargetAddress - WindowBytes / 2
+        : FunctionStart;
+
+    if (VisibleStart < FunctionStart)
+    {
+        VisibleStart = FunctionStart;
+    }
+
+    VSGDBCore::U64 VisibleEnd =
+        TargetAddress + WindowBytes / 2;
+
+    if (VisibleEnd > FunctionEnd)
+    {
+        VisibleEnd = FunctionEnd;
+    }
+
+    const VSGDBCore::U32 DecodeBytes =
+        static_cast<VSGDBCore::U32>(VisibleEnd - FunctionStart);
+
+    return DisassembleRange(
+        FunctionStart,
+        DecodeBytes,
+        Registers.Value.Rip,
+        VisibleStart,
+        VisibleEnd);
 }
 
 bool
@@ -1722,7 +1883,8 @@ CommandProcessor::ExecuteReload(
     auto Base = EvaluateSimpleExpression(
         Target,
         CurrentCpuId,
-        Arguments[2]);
+        Arguments[2],
+        SymbolManager.get());
 
     if (!Base.HasValue())
     {
@@ -1737,7 +1899,8 @@ CommandProcessor::ExecuteReload(
         auto ParsedSize = EvaluateSimpleExpression(
             Target,
             CurrentCpuId,
-            Arguments[3]);
+            Arguments[3],
+            SymbolManager.get());
 
         if (!ParsedSize.HasValue())
         {
@@ -1780,44 +1943,377 @@ CommandProcessor::ExecuteReload(
     return true;
 }
 
-AddressLabel
-CommandProcessor::FormatAddressWithModule(
-    VSGDBCore::U64 Address) const
+bool
+CommandProcessor::ExecuteSymbolLoad(
+    const std::vector<std::wstring>& Arguments)
 {
-    AddressLabel Label{};
-
-    if (!ModuleManager)
+    if (Arguments.size() != 2)
     {
-        return Label;
+        std::wprintf(L"Usage: .symload <module-id>\n");
+        return false;
     }
 
-    auto Module = ModuleManager->GetModuleByAddress(Address);
+    VSGDBCore::U64 ModuleIdValue = 0;
+
+    auto ParsedId = EvaluateSimpleExpression(
+        Target,
+        CurrentCpuId,
+        Arguments[1],
+        SymbolManager.get());
+
+    if (!ParsedId.HasValue())
+    {
+        PrintDebugError(L"Invalid module ID", ParsedId.Error);
+        return false;
+    }
+
+    ModuleIdValue = ParsedId.Value;
+
+    if (ModuleIdValue == 0 ||
+        ModuleIdValue > 0xffffffffull)
+    {
+        std::wprintf(L"Invalid module ID.\n");
+        return false;
+    }
+
+    auto Module = ModuleManager->GetModuleById(
+        static_cast<VSGDBCore::ModuleId>(ModuleIdValue));
 
     if (!Module.HasValue())
     {
-        return Label;
+        PrintDebugError(L"Failed to find module", Module.Error);
+        return false;
     }
 
-    const VSGDBCore::U64 Offset =
-        Address - Module.Value.BaseAddress;
+    VSGDBCore::DebugError Error =
+        SymbolManager->LoadSymbolsForModule(Module.Value);
 
-    wchar_t KeyBuffer[64] = {};
-    std::swprintf(
-        KeyBuffer,
-        _countof(KeyBuffer),
-        L"module:%u",
-        Module.Value.Id);
+    if (!Error.IsSuccess())
+    {
+        PrintDebugError(L"Failed to load symbols", Error);
+        return false;
+    }
 
-    wchar_t TextBuffer[256] = {};
-    std::swprintf(
-        TextBuffer,
-        _countof(TextBuffer),
-        L"%s+0x%llx",
-        Module.Value.Name.c_str(),
-        Offset);
+    std::wprintf(
+        L"Loaded symbols for %s.\n",
+        Module.Value.Name.c_str());
 
-    Label.Key = KeyBuffer;
-    Label.Text = TextBuffer;
+    return true;
+}
 
-    return Label;
+bool
+CommandProcessor::ExecuteSymbolLookup(
+    const std::vector<std::wstring>& Arguments)
+{
+    if (Arguments.size() != 2)
+    {
+        std::wprintf(L"Usage: x <symbol-name>\n");
+        return false;
+    }
+
+    if (!SymbolManager)
+    {
+        std::wprintf(L"No symbol manager is available.\n");
+        return false;
+    }
+
+    auto Symbol = SymbolManager->GetSymbolByName(
+        Arguments[1]);
+
+    if (!Symbol.HasValue())
+    {
+        PrintDebugError(
+            L"Failed to find symbol",
+            Symbol.Error);
+
+        return false;
+    }
+
+    std::wstring ModuleName = L"?";
+
+    if (ModuleManager)
+    {
+        auto Module = ModuleManager->GetModuleById(
+            Symbol.Value.ModuleId);
+
+        if (Module.HasValue())
+        {
+            if (!Module.Value.Name.empty())
+            {
+                ModuleName = Module.Value.Name;
+            }
+            else if (!Module.Value.ImagePath.empty())
+            {
+                ModuleName = Module.Value.ImagePath;
+            }
+        }
+    }
+
+    std::wprintf(
+        L"0x%016llx  %s",
+        Symbol.Value.Address,
+        Symbol.Value.Name.c_str());
+
+    if (Symbol.Value.Size != 0)
+    {
+        std::wprintf(
+            L"  Size=0x%x",
+            Symbol.Value.Size);
+    }
+
+    std::wprintf(
+        L"  Module=%s\n",
+        ModuleName.c_str());
+
+    return true;
+}
+
+bool
+CommandProcessor::DisassembleRange(
+    VSGDBCore::U64 StartAddress,
+    VSGDBCore::U32 ByteCount,
+    VSGDBCore::U64 CurrentRip,
+    VSGDBCore::U64 VisibleStart,
+    VSGDBCore::U64 VisibleEnd)
+{
+    static constexpr VSGDBCore::U32 MaxInstructionLength = 15;
+
+    const VSGDBCore::U32 ReadSize =
+        ByteCount + MaxInstructionLength;
+
+    auto Bytes = Target.ReadVirtualMemory(
+        CurrentCpuId,
+        StartAddress,
+        ReadSize);
+
+    if (!Bytes.HasValue())
+    {
+        PrintDebugError(L"Failed to read memory", Bytes.Error);
+        return false;
+    }
+
+    auto Instructions = Disassembler->Disassemble(
+        StartAddress,
+        Bytes.Value,
+        4096);
+
+    if (!Instructions.HasValue())
+    {
+        PrintDebugError(L"Failed to disassemble", Instructions.Error);
+        return false;
+    }
+
+    std::vector<VSGDBCore::DisassembledInstruction> Visible;
+
+    const VSGDBCore::U64 EndAddress =
+        StartAddress + ByteCount;
+
+    for (const auto& Instruction : Instructions.Value)
+    {
+        if (Instruction.Address >= StartAddress &&
+            Instruction.Address < EndAddress)
+        {
+            if (Instruction.Address >= VisibleStart &&
+                Instruction.Address < VisibleEnd)
+            {
+                Visible.push_back(Instruction);
+            }
+        }
+    }
+
+    PrintDisassembly(
+        Visible,
+        CurrentRip,
+        [this](VSGDBCore::U64 Address)
+        {
+            return Formatter->FormatAddressLabel(Address);
+        });
+
+    return true;
+}
+
+bool
+CommandProcessor::ExecuteSourceLine(
+    const std::vector<std::wstring>& Arguments)
+{
+    if (Arguments.size() > 2)
+    {
+        std::wprintf(L"Usage: line [expr]\n");
+        return false;
+    }
+
+    if (!SymbolManager)
+    {
+        std::wprintf(L"No symbol manager is available.\n");
+        return false;
+    }
+
+    std::wstring AddressExpression = L"rip";
+
+    if (Arguments.size() == 2)
+    {
+        AddressExpression = Arguments[1];
+    }
+
+    auto Address = EvaluateSimpleExpression(
+        Target,
+        CurrentCpuId,
+        AddressExpression,
+        SymbolManager.get());
+
+    if (!Address.HasValue())
+    {
+        PrintDebugError(
+            L"Failed to evaluate address",
+            Address.Error);
+
+        return false;
+    }
+
+    auto Location =
+        SymbolManager->GetSourceLocationByAddress(Address.Value);
+
+    if (!Location.HasValue())
+    {
+        PrintDebugError(
+            L"Failed to find source line",
+            Location.Error);
+
+        return false;
+    }
+
+    std::wprintf(
+        L"%s\n",
+        Formatter->FormatAddressInline(Address.Value).c_str());
+
+    if (Location.Value.Column != 0)
+    {
+        std::wprintf(
+            L"%s:%u:%u\n",
+            Location.Value.FilePath.c_str(),
+            Location.Value.Line,
+            Location.Value.Column);
+    }
+    else
+    {
+        std::wprintf(
+            L"%s:%u\n",
+            Location.Value.FilePath.c_str(),
+            Location.Value.Line);
+    }
+
+    return true;
+}
+
+bool
+CommandProcessor::ExecuteSymbol(
+    const std::vector<std::wstring>& Arguments)
+{
+    if (Arguments.size() != 2)
+    {
+        std::wprintf(L"Usage: x <symbol-name|pattern>\n");
+        return false;
+    }
+
+    const SymbolQuery Query =
+        ParseSymbolQuery(Arguments[1]);
+
+    if (IsSymbolEnumerationQuery(Query))
+    {
+        return ExecuteSymbolSearch(Query);
+    }
+
+    return ExecuteSymbolLookup(Arguments);
+}
+
+bool
+CommandProcessor::ExecuteSymbolSearch(
+    const SymbolQuery& Query)
+{
+    size_t Printed = 0;
+    bool Truncated = false;
+
+    const auto Modules =
+        ModuleManager->EnumerateModules();
+
+    for (const auto& Module : Modules)
+    {
+        auto Symbols =
+            SymbolManager->EnumerateSymbols(Module.Id);
+
+        if (!Symbols.HasValue())
+        {
+            continue;
+        }
+
+        for (const auto& Symbol : Symbols.Value)
+        {
+            if (!MatchesSymbolQuery(Symbol.Name, Query))
+            {
+                continue;
+            }
+
+            PrintSymbolInfo(Symbol, &Module);
+
+            ++Printed;
+
+            if (Printed >= MaxSymbolSearchResults)
+            {
+                Truncated = true;
+                break;
+            }
+        }
+
+        if (Truncated)
+        {
+            break;
+        }
+    }
+
+    if (Printed == 0)
+    {
+        std::wprintf(L"No matching symbols.\n");
+        return false;
+    }
+
+    if (Truncated)
+    {
+        std::wprintf(
+            L"Results truncated after %zu symbols.\n",
+            MaxSymbolSearchResults);
+    }
+
+    return true;
+}
+
+void
+CommandProcessor::PrintSymbolInfo(
+    const VSGDBCore::SymbolInfo& Symbol,
+    const VSGDBCore::ModuleInfo* Module) const
+{
+    std::wprintf(
+        L"0x%016llx  %-48s",
+        Symbol.Address,
+        Symbol.Name.c_str());
+
+    if (Symbol.Size != 0)
+    {
+        std::wprintf(
+            L"  Size=0x%x",
+            Symbol.Size);
+    }
+    else
+    {
+        std::wprintf(
+            L"  Size=?");
+    }
+
+    if (Module != nullptr)
+    {
+        std::wprintf(
+            L"  Module=%s",
+            Module->Name.c_str());
+    }
+
+    std::wprintf(L"\n");
 }

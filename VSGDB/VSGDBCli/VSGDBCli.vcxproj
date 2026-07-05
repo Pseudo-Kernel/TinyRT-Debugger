@@ -70,6 +70,18 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib\amd64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib\amd64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LibraryPath>$(VSInstallDir)DIA SDK\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -136,6 +148,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CommandProcessor.cpp" />
+    <ClCompile Include="DebugTextFormatter.cpp" />
     <ClCompile Include="DisassemblyPrinter.cpp" />
     <ClCompile Include="ExpressionUtil.cpp" />
     <ClCompile Include="Main.cpp" />
@@ -143,6 +156,7 @@
     <ClCompile Include="PageFaultPrinter.cpp" />
     <ClCompile Include="PagingPrinter.cpp" />
     <ClCompile Include="RemoteThreadIdUtil.cpp" />
+    <ClCompile Include="SymbolQuery.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\VSGDBCore\VSGDBCore.vcxproj">
@@ -151,12 +165,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommandProcessor.h" />
+    <ClInclude Include="DebugTextFormatter.h" />
     <ClInclude Include="DisassemblyPrinter.h" />
     <ClInclude Include="ExpressionUtil.h" />
     <ClInclude Include="MemoryPrinter.h" />
     <ClInclude Include="PageFaultPrinter.h" />
     <ClInclude Include="PagingPrinter.h" />
     <ClInclude Include="RemoteThreadIdUtil.h" />
+    <ClInclude Include="SymbolQuery.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

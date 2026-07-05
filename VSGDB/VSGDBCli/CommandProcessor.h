@@ -3,6 +3,10 @@
 #include <VSGDBCore/GdbRemoteTarget.h>
 #include <VSGDBCore/IDisassembler.h>
 #include <VSGDBCore/IModuleManager.h>
+#include <VSGDBCore/ISymbolManager.h>
+
+#include "DebugTextFormatter.h"
+#include "SymbolQuery.h"
 
 #include <memory>
 #include <string>
@@ -26,7 +30,8 @@ public:
     explicit CommandProcessor(
         VSGDBCore::GdbRemoteTarget& Target,
         std::unique_ptr<VSGDBCore::IDisassembler> Disassembler,
-        std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager);
+        std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager,
+        std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager);
 
     int Run();
 
@@ -109,15 +114,43 @@ private:
     bool ExecuteDisassemble(
         const std::vector<std::wstring>& Arguments);
 
+    bool ExecuteDisassembleFunction(
+        const std::vector<std::wstring>& Arguments);
+
+    bool ExecuteDisassembleBackwardWindow(
+        const std::vector<std::wstring>& Arguments);
+
     bool ExecuteListModules(
         const std::vector<std::wstring>& Arguments);
 
     bool ExecuteReload(
         const std::vector<std::wstring>& Arguments);
 
-    AddressLabel
-        FormatAddressWithModule(
-            VSGDBCore::U64 Address) const;
+    bool ExecuteSymbolLoad(
+        const std::vector<std::wstring>& Arguments);
+
+    bool ExecuteSymbolLookup(
+        const std::vector<std::wstring>& Arguments);
+
+    bool DisassembleRange(
+        VSGDBCore::U64 DecodeStart,
+        VSGDBCore::U32 DecodeBytes,
+        VSGDBCore::U64 CurrentRip,
+        VSGDBCore::U64 VisibleStart,
+        VSGDBCore::U64 VisibleEnd);
+
+    bool ExecuteSourceLine(
+        const std::vector<std::wstring>& Arguments);
+
+    bool ExecuteSymbol(
+        const std::vector<std::wstring>& Arguments);
+
+    bool ExecuteSymbolSearch(
+        const SymbolQuery& Query);
+
+    void PrintSymbolInfo(
+        const VSGDBCore::SymbolInfo& Symbol,
+        const VSGDBCore::ModuleInfo* Module) const;
 
 private:
     VSGDBCore::GdbRemoteTarget& Target;
@@ -131,4 +164,7 @@ private:
 
     std::unique_ptr<VSGDBCore::IDisassembler> Disassembler;
     std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager;
+    std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager;
+
+    std::unique_ptr<DebugTextFormatter> Formatter;
 };

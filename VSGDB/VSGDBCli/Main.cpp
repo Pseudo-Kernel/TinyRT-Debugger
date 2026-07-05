@@ -9,6 +9,10 @@
 #include "DisassemblyPrinter.h"
 #include "CommandProcessor.h"
 
+#pragma comment(lib, "diaguids.lib")
+
+
+
 static std::atomic<CommandProcessor*> g_CommandProcessor = nullptr;
 
 static BOOL WINAPI
@@ -95,7 +99,8 @@ main(
     CommandProcessor Processor(
         Target,
         VSGDBCore::CreateDefaultDisassembler(),
-        VSGDBCore::CreateModuleManager());
+        VSGDBCore::CreateModuleManager(),
+        VSGDBCore::CreateDefaultSymbolManager());
 
     g_CommandProcessor.store(&Processor, std::memory_order_release);
 

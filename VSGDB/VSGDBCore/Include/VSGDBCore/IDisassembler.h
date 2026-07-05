@@ -21,6 +21,9 @@ namespace VSGDBCore
         std::wstring Mnemonic;
         std::wstring Operands;
         std::wstring Text;
+
+        bool HasBranchTarget = false;
+        U64 BranchTarget = 0;
     };
 
     class IDisassembler

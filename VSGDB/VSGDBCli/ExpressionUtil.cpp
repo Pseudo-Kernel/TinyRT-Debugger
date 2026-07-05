@@ -109,7 +109,8 @@ static VSGDBCore::Expected<VSGDBCore::U64>
 EvaluateAtom(
     VSGDBCore::GdbRemoteTarget& Target,
     VSGDBCore::U32 CpuId,
-    const std::wstring& Atom)
+    const std::wstring& Atom,
+    const VSGDBCore::ISymbolManager* SymbolManager)
 {
     VSGDBCore::U64 Value = 0;
 
@@ -118,17 +119,37 @@ EvaluateAtom(
         return VSGDBCore::Expected<VSGDBCore::U64>::Success(Value);
     }
 
-    return EvaluateRegisterName(
+    auto Result = EvaluateRegisterName(
         Target,
         CpuId,
         Atom);
+    if (Result.HasValue())
+    {
+        return Result;
+    }
+
+    if (SymbolManager != nullptr)
+    {
+        auto Symbol = SymbolManager->GetSymbolByName(Atom);
+
+        if (Symbol.HasValue())
+        {
+            return VSGDBCore::Expected<VSGDBCore::U64>::Success(Symbol.Value.Address);
+        }
+    }
+
+    return VSGDBCore::Expected<VSGDBCore::U64>::Failure(
+        VSGDBCore::DebugError::Failure(
+            VSGDBCore::ErrorCode::InvalidArgument,
+            L"Expression atom is not a number, register, or symbol."));
 }
 
 VSGDBCore::Expected<VSGDBCore::U64>
 EvaluateSimpleExpression(
     VSGDBCore::GdbRemoteTarget& Target,
     VSGDBCore::U32 CpuId,
-    const std::wstring& Expression)
+    const std::wstring& Expression,
+    const VSGDBCore::ISymbolManager* SymbolManager)
 {
     if (Expression.empty())
     {
@@ -160,7 +181,8 @@ EvaluateSimpleExpression(
         return EvaluateAtom(
             Target,
             CpuId,
-            Expression);
+            Expression,
+            SymbolManager);
     }
 
     const std::wstring LeftText =
@@ -180,7 +202,8 @@ EvaluateSimpleExpression(
     auto Left = EvaluateAtom(
         Target,
         CpuId,
-        LeftText);
+        LeftText,
+        SymbolManager);
 
     if (!Left.HasValue())
     {
@@ -190,7 +213,8 @@ EvaluateSimpleExpression(
     auto Right = EvaluateAtom(
         Target,
         CpuId,
-        RightText);
+        RightText,
+        SymbolManager);
 
     if (!Right.HasValue())
     {

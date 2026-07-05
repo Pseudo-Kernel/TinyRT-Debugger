@@ -1,80 +1,63 @@
 #include <VSGDBCore/NullComponents.h>
+#include "NullSymbolManager.h"
 
 namespace VSGDBCore
 {
-    class NullSymbolManager final : public ISymbolManager
+    DebugError
+        NullSymbolManager::LoadSymbolsForModule(
+            const ModuleInfo & Module)
     {
-    public:
-        DebugError LoadSymbols(
-            const ModuleInfo& Module) override
-        {
-            (void)Module;
+        return DebugError::Failure(
+            ErrorCode::NotSupported,
+            L"Symbol manager is not available.");
+    }
 
-            return DebugError::Failure(
-                ErrorCode::NotSupported,
-                L"Symbol manager is not available.");
-        }
-
-        DebugError UnloadSymbols(
-            const std::wstring& ModuleName) override
-        {
-            (void)ModuleName;
-
-            return DebugError::Failure(
-                ErrorCode::NotSupported,
-                L"Symbol manager is not available.");
-        }
-
-        Expected<ResolvedSymbol> GetNearestSymbol(
-            U64 Address) const override
-        {
-            (void)Address;
-
-            return Expected<ResolvedSymbol>::Failure(
-                DebugError::Failure(
-                    ErrorCode::NotSupported,
-                    L"Symbol manager is not available."));
-        }
-
-        Expected<ResolvedSymbol> AddressToSymbol(
-            U64 Address) const override
-        {
-            (void)Address;
-
-            return Expected<ResolvedSymbol>::Failure(
-                DebugError::Failure(
-                    ErrorCode::NotSupported,
-                    L"Symbol manager is not available."));
-        }
-
-        Expected<SourceLocation> AddressToSourceLine(
-            U64 Address) const override
-        {
-            (void)Address;
-
-            return Expected<SourceLocation>::Failure(
-                DebugError::Failure(
-                    ErrorCode::NotSupported,
-                    L"Symbol manager is not available."));
-        }
-
-        Expected<std::vector<U64>> SourceLineToAddress(
-            const std::wstring& FilePath,
-            U32 Line) const override
-        {
-            (void)FilePath;
-            (void)Line;
-
-            return Expected<std::vector<U64>>::Failure(
-                DebugError::Failure(
-                    ErrorCode::NotSupported,
-                    L"Symbol manager is not available."));
-        }
-    };
-
-    std::unique_ptr<ISymbolManager>
-        CreateNullSymbolManager()
+    DebugError
+        NullSymbolManager::UnloadSymbolsForModule(
+            ModuleId ModuleId)
     {
-        return std::make_unique<NullSymbolManager>();
+        return DebugError::Failure(
+            ErrorCode::NotSupported,
+            L"Symbol manager is not available.");
+    }
+
+    Expected<SymbolInfo>
+        NullSymbolManager::GetSymbolByAddress(
+            U64 Address) const
+    {
+        return Expected<SymbolInfo>::Failure(
+            DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"No symbol manager is available."));
+    }
+    
+    Expected<SymbolInfo>
+        NullSymbolManager::GetSymbolByName(
+            const std::wstring & Name) const
+    {
+        return Expected<SymbolInfo>::Failure(
+            DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"No symbol manager is available."));
+    }
+
+    Expected<SourceLocation>
+        NullSymbolManager::GetSourceLocationByAddress(
+            U64 Address) const
+    {
+        return Expected<SourceLocation>::Failure(
+            DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"No symbol manager is available."));
+    }
+
+    Expected<std::vector<SymbolInfo>>
+        NullSymbolManager::EnumerateSymbols(
+            ModuleId ModuleId) const
+    {
+        return Expected<std::vector<SymbolInfo>>::Failure(
+            DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"No symbol manager is available."));
     }
 }
