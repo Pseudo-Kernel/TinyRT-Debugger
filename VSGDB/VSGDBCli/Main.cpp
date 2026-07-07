@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <atomic>
+#include <filesystem>
+
 #include <Windows.h>
 
 #include <VSGDBCore/GdbRemoteTarget.h>
@@ -8,12 +10,33 @@
 
 #include "DisassemblyPrinter.h"
 #include "CommandProcessor.h"
+#include "CommandScript.h"
 
 #pragma comment(lib, "diaguids.lib")
 
 
+struct CliOptions
+{
+    std::wstring Host = L"127.0.0.1";
+    VSGDBCore::U16 Port = 1234;
+    std::wstring InitScriptPath;
+};
+
 
 static std::atomic<CommandProcessor*> g_CommandProcessor = nullptr;
+
+static std::wstring
+FindDefaultInitScript()
+{
+    const std::filesystem::path Path = L".vsgdbinit";
+
+    if (std::filesystem::exists(Path))
+    {
+        return Path.wstring();
+    }
+
+    return L"";
+}
 
 static BOOL WINAPI
 ConsoleControlHandler(
@@ -45,32 +68,51 @@ ConsoleControlHandler(
     return TRUE;
 }
 
+
+
 int
-main(
-    int ArgumentCount,
-    char** Arguments)
+wmain(
+    int argc,
+    wchar_t** argv)
 {
     if (!SetConsoleCtrlHandler(ConsoleControlHandler, TRUE))
     {
         std::printf("Warning: failed to install console Ctrl+C handler.\n");
     }
 
-    VSGDBCore::U16 Port = 1234;
+    CliOptions Options;
 
-    if (ArgumentCount >= 2)
+    for (int i = 1; i < argc; i++)
     {
-        Port = static_cast<VSGDBCore::U16>(
-            std::strtoul(Arguments[1], nullptr, 0));
+        if (!_wcsicmp(argv[i], L"--host") && i + 1 < argc)
+        {
+            Options.Host = argv[++i];
+        }
+        else if (!_wcsicmp(argv[i], L"--port") && i + 1 < argc)
+        {
+            Options.Port = static_cast<VSGDBCore::U16>(
+                std::wcstoul(argv[++i], nullptr, 0));
+        }
+        else if (!_wcsicmp(argv[i], L"--init") && i + 1 < argc)
+        {
+            Options.InitScriptPath = argv[++i];
+        }
+    }
+
+    if (Options.InitScriptPath.empty())
+    {
+        Options.InitScriptPath = FindDefaultInitScript();
     }
 
     std::printf("VSGDB CLI\n");
-    std::printf("Connecting to GDB remote target at 127.0.0.1:%u...\n", Port);
+    std::wprintf(L"Connecting to GDB remote target at %s:%u...\n", 
+        Options.Host.c_str(), Options.Port);
 
     VSGDBCore::GdbRemoteTarget Target;
 
     VSGDBCore::DebugTargetConfig Config{};
-    Config.Host = L"127.0.0.1";
-    Config.Port = Port;
+    Config.Host = Options.Host;
+    Config.Port = Options.Port;
 
     auto Error = Target.Connect(Config);
     if (!Error.IsSuccess())
@@ -86,23 +128,39 @@ main(
 
     std::printf("Connected.\n");
 
-    //auto Event = Target.WaitForEvent(0);
-    //if (Event.HasValue())
-    //{
-    //    std::wprintf(
-    //        L"Stop: %s\n",
-    //        Event.Value.Description.c_str());
-    //}
+    auto Event = Target.WaitForEvent(0);
+    if (Event.HasValue())
+    {
+        std::wprintf(
+            L"Stop: %s\n",
+            Event.Value.Description.c_str());
+    }
 
-
+    auto Disassembler = VSGDBCore::CreateDefaultDisassembler();
+    auto ModuleManager = VSGDBCore::CreateModuleManager();
+    auto SymbolManager = VSGDBCore::CreateDefaultSymbolManager();
+    auto StackWalker = VSGDBCore::CreateX64PeUnwindStackWalker(ModuleManager.get());
 
     CommandProcessor Processor(
         Target,
-        VSGDBCore::CreateDefaultDisassembler(),
-        VSGDBCore::CreateModuleManager(),
-        VSGDBCore::CreateDefaultSymbolManager());
+        std::move(Disassembler),
+        std::move(ModuleManager),
+        std::move(SymbolManager),
+        std::move(StackWalker)
+//        VSGDBCore::CreateX64FramePointerStackWalker()
+    );
 
     g_CommandProcessor.store(&Processor, std::memory_order_release);
+
+    if (!Options.InitScriptPath.empty())
+    {
+        if (!ExecuteCommandScript(
+            Processor,
+            Options.InitScriptPath))
+        {
+            return 1;
+        }
+    }
 
     const int ExitCode = Processor.Run();
 

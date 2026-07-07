@@ -118,8 +118,13 @@ namespace VSGDBCore
         static Expected<std::wstring> GetSymbolName(
             IDiaSymbol* Symbol);
 
-        static Expected<U32> GetSymbolRva(
-            IDiaSymbol* Symbol);
+        Expected<U32> GetSymbolRva(
+            IDiaSymbol* Symbol) const;
+
+        Expected<U64>
+            GetSymbolRuntimeAddress(
+                const LoadedModule& Loaded,
+                IDiaSymbol* Symbol) const;
 
         static Expected<U64> GetSymbolLength(
             IDiaSymbol* Symbol);
@@ -129,6 +134,14 @@ namespace VSGDBCore
 
         const LoadedModule* FindLoadedModuleById(
             ModuleId ModuleId) const;
+
+        Expected<SymbolInfo>
+            BuildSymbolInfo(
+                const LoadedModule& Loaded,
+                IDiaSymbol* DiaSymbol,
+                SymbolKind Kind,
+                enum SymTagEnum NativeTag) const;
+
 
         std::vector<LoadedModule> LoadedModules;
     };

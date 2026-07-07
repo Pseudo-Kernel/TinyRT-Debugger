@@ -32,6 +32,7 @@
     <ClInclude Include="Include\VSGDBCore\IExpressionEvaluator.h" />
     <ClInclude Include="Include\VSGDBCore\IModuleManager.h" />
     <ClInclude Include="Include\VSGDBCore\IOutputSink.h" />
+    <ClInclude Include="Include\VSGDBCore\IStackWalker.h" />
     <ClInclude Include="Include\VSGDBCore\ISymbolManager.h" />
     <ClInclude Include="Include\VSGDBCore\MemoryTypes.h" />
     <ClInclude Include="Include\VSGDBCore\ModuleTypes.h" />
@@ -39,10 +40,12 @@
     <ClInclude Include="Include\VSGDBCore\RegisterContext.h" />
     <ClInclude Include="Include\VSGDBCore\RegisterTypes.h" />
     <ClInclude Include="Include\VSGDBCore\Result.h" />
+    <ClInclude Include="Include\VSGDBCore\StackTypes.h" />
     <ClInclude Include="Include\VSGDBCore\SymbolTypes.h" />
     <ClInclude Include="Include\VSGDBCore\ThreadTypes.h" />
     <ClInclude Include="Include\VSGDBCore\Types.h" />
     <ClInclude Include="Include\VSGDBCore\X64Paging.h" />
+    <ClInclude Include="Include\VSGDBCore\X64UnwindTypes.h" />
     <ClInclude Include="Include\VSGDBCore\_DebugSessionConfig.h" />
     <ClInclude Include="Include\VSGDBCore\_IDebugEventSink.h" />
     <ClInclude Include="Source\Disassembly\ZydisDisassembler.h" />
@@ -50,6 +53,9 @@
     <ClInclude Include="Source\Gdb\GdbRegisterCodec.h" />
     <ClInclude Include="Source\Gdb\GdbTargetDescription.h" />
     <ClInclude Include="Source\Modules\ModuleManager.h" />
+    <ClInclude Include="Source\Stack\X64FramePointerStackWalker.h" />
+    <ClInclude Include="Source\Stack\X64PeUnwindData.h" />
+    <ClInclude Include="Source\Stack\X64PeUnwindStackWalker.h" />
     <ClInclude Include="Source\Symbols\DiaSymbolManager.h" />
     <ClInclude Include="Source\Symbols\NullSymbolManager.h" />
   </ItemGroup>
@@ -68,6 +74,9 @@
     <ClCompile Include="Source\Gdb\GdbTargetDescription.cpp" />
     <ClCompile Include="Source\Modules\ModuleManager.cpp" />
     <ClCompile Include="Source\Paging\X64Paging.cpp" />
+    <ClCompile Include="Source\Stack\X64FramePointerStackWalker.cpp" />
+    <ClCompile Include="Source\Stack\X64PeUnwindData.cpp" />
+    <ClCompile Include="Source\Stack\X64PeUnwindStackWalker.cpp" />
     <ClCompile Include="Source\Symbols\DiaSymbolManager.cpp" />
     <ClCompile Include="Source\Symbols\NullSymbolManager.cpp" />
     <ClCompile Include="Source\Targets\NullDebugTarget.cpp" />

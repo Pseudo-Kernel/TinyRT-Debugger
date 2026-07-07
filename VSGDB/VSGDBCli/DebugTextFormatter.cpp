@@ -199,6 +199,96 @@ DebugTextFormatter::PrintRegisterByName(
         return true;
     }
 
+    if (Lower == L"rbx")
+    {
+        PrintRegister(L"RBX", Registers.Rbx);
+        return true;
+    }
+
+    if (Lower == L"rcx")
+    {
+        PrintRegister(L"RCX", Registers.Rcx);
+        return true;
+    }
+
+    if (Lower == L"rdx")
+    {
+        PrintRegister(L"RDX", Registers.Rdx);
+        return true;
+    }
+
+    if (Lower == L"rsi")
+    {
+        PrintRegister(L"RSI", Registers.Rsi);
+        return true;
+    }
+
+    if (Lower == L"rdi")
+    {
+        PrintRegister(L"RDI", Registers.Rdi);
+        return true;
+    }
+
+    if (Lower == L"rbp")
+    {
+        PrintRegister(L"RBP", Registers.Rbp);
+        return true;
+    }
+
+    if (Lower == L"rsp")
+    {
+        PrintRegister(L"RSP", Registers.Rsp);
+        return true;
+    }
+
+    if (Lower == L"r8")
+    {
+        PrintRegister(L"R8", Registers.R8);
+        return true;
+    }
+
+    if (Lower == L"r9")
+    {
+        PrintRegister(L"R9", Registers.R9);
+        return true;
+    }
+
+    if (Lower == L"r10")
+    {
+        PrintRegister(L"R10", Registers.R10);
+        return true;
+    }
+
+    if (Lower == L"r11")
+    {
+        PrintRegister(L"R11", Registers.R11);
+        return true;
+    }
+
+    if (Lower == L"r12")
+    {
+        PrintRegister(L"R12", Registers.R12);
+        return true;
+    }
+
+    if (Lower == L"r13")
+    {
+        PrintRegister(L"R13", Registers.R13);
+        return true;
+    }
+
+    if (Lower == L"r14")
+    {
+        PrintRegister(L"R14", Registers.R14);
+        return true;
+    }
+
+    if (Lower == L"r15")
+    {
+        PrintRegister(L"R15", Registers.R15);
+        return true;
+    }
+
     if (Lower == L"rip")
     {
         PrintRegister(L"RIP", Registers.Rip);
@@ -211,15 +301,93 @@ DebugTextFormatter::PrintRegisterByName(
         return true;
     }
 
-    if (Lower == L"cr3")
+    if (Lower == L"cs")
     {
-        PrintRegisterRaw(L"CR3", Registers.Cr3);
+        PrintRegisterRaw(L"CS", Registers.Cs);
+        return true;
+    }
+
+    if (Lower == L"ss")
+    {
+        PrintRegisterRaw(L"SS", Registers.Ss);
+        return true;
+    }
+
+    if (Lower == L"ds")
+    {
+        PrintRegisterRaw(L"DS", Registers.Ds);
+        return true;
+    }
+
+    if (Lower == L"es")
+    {
+        PrintRegisterRaw(L"ES", Registers.Es);
+        return true;
+    }
+
+    if (Lower == L"fs")
+    {
+        PrintRegisterRaw(L"FS", Registers.Fs);
+        return true;
+    }
+
+    if (Lower == L"gs")
+    {
+        PrintRegisterRaw(L"GS", Registers.Gs);
+        return true;
+    }
+
+    if (Lower == L"fs_base")
+    {
+        PrintRegisterRaw(L"FS_BASE", Registers.FsBase);
+        return true;
+    }
+
+    if (Lower == L"gs_base")
+    {
+        PrintRegisterRaw(L"GS_BASE", Registers.GsBase);
+        return true;
+    }
+
+    if (Lower == L"kgs_base")
+    {
+        PrintRegisterRaw(L"KGS_BASE", Registers.KernelGsBase);
+        return true;
+    }
+
+    if (Lower == L"cr0")
+    {
+        PrintRegisterRaw(L"CR0", Registers.Cr0);
         return true;
     }
 
     if (Lower == L"cr2")
     {
         PrintRegister(L"CR2", Registers.Cr2);
+        return true;
+    }
+
+    if (Lower == L"cr3")
+    {
+        PrintRegisterRaw(L"CR3", Registers.Cr3);
+        return true;
+    }
+
+    if (Lower == L"cr4")
+    {
+        PrintRegisterRaw(L"CR4", Registers.Cr4);
+        return true;
+    }
+
+    if (Lower == L"cr8")
+    {
+        PrintRegisterRaw(L"CR8", Registers.Cr8);
+        return true;
+    }
+
+    if (Lower == L"efer")
+    {
+        PrintRegisterRaw(L"EFER", Registers.Efer);
         return true;
     }
 

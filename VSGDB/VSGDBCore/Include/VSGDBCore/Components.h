@@ -3,6 +3,7 @@
 #include "IDisassembler.h"
 #include "IModuleManager.h"
 #include "ISymbolManager.h"
+#include "IStackWalker.h"
 
 #include <memory>
 
@@ -14,4 +15,9 @@ namespace VSGDBCore
 
     std::unique_ptr<IModuleManager> CreateModuleManager();
     std::unique_ptr<ISymbolManager> CreateDefaultSymbolManager();
+
+    std::unique_ptr<IStackWalker> CreateX64FramePointerStackWalker();
+    std::unique_ptr<IStackWalker>
+        CreateX64PeUnwindStackWalker(
+            const IModuleManager* ModuleManager);
 }

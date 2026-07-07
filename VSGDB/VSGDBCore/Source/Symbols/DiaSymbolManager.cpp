@@ -4,6 +4,84 @@
 
 namespace VSGDBCore
 {
+    struct DiaSymbolTagPolicy
+    {
+        enum SymTagEnum Tag;
+        SymbolKind Kind;
+    };
+
+    static constexpr DiaSymbolTagPolicy g_DiaSymbolSearchTags[] =
+    {
+        { SymTagFunction,     SymbolKind::Function },
+        { SymTagData,         SymbolKind::Data },
+        { SymTagPublicSymbol, SymbolKind::PublicSymbol },
+        { SymTagLabel,        SymbolKind::Label },
+    };
+
+    static int
+        GetSymbolKindPriority(
+            SymbolKind Kind)
+    {
+        switch (Kind)
+        {
+        case SymbolKind::Function: return 0;
+        case SymbolKind::Data: return 1;
+        case SymbolKind::Label: return 2;
+        case SymbolKind::PublicSymbol: return 3;
+        default: return 4;
+        }
+    }
+
+    static void
+        DeduplicateSymbols(
+            std::vector<SymbolInfo>& Symbols)
+    {
+        std::sort(
+            Symbols.begin(),
+            Symbols.end(),
+            [](const SymbolInfo& Left, const SymbolInfo& Right)
+            {
+                if (Left.ModuleId != Right.ModuleId)
+                {
+                    return Left.ModuleId < Right.ModuleId;
+                }
+
+                if (Left.Address != Right.Address)
+                {
+                    return Left.Address < Right.Address;
+                }
+
+                if (Left.Name != Right.Name)
+                {
+                    return Left.Name < Right.Name;
+                }
+
+                return GetSymbolKindPriority(Left.Kind) <
+                    GetSymbolKindPriority(Right.Kind);
+            });
+
+        std::vector<SymbolInfo> Unique;
+        Unique.reserve(Symbols.size());
+
+        for (const SymbolInfo& Symbol : Symbols)
+        {
+            if (!Unique.empty() &&
+                Unique.back().ModuleId == Symbol.ModuleId &&
+                Unique.back().Address == Symbol.Address &&
+                Unique.back().Name == Symbol.Name)
+            {
+                //
+                // Existing one has better or equal priority because of sort.
+                //
+                continue;
+            }
+
+            Unique.push_back(Symbol);
+        }
+
+        Symbols.swap(Unique);
+    }
+
     DiaSymbolManager::DiaSymbolManager()
     {
         (void)::CoInitializeEx(
@@ -153,54 +231,88 @@ namespace VSGDBCore
         const U32 Rva =
             static_cast<U32>(Address - Loaded->Module.BaseAddress);
 
-        ComPtr<IDiaSymbol> DiaSymbol;
-
-        HRESULT Hr = Loaded->Session->findSymbolByRVA(
-            Rva,
-            SymTagFunction,
-            DiaSymbol.Put());
-
-        if (FAILED(Hr) || DiaSymbol == nullptr)
+        //
+        // 1. Function containing address.
+        //
         {
-            Hr = Loaded->Session->findSymbolByRVA(
+            ComPtr<IDiaSymbol> DiaSymbol;
+
+            HRESULT Hr = Loaded->Session->findSymbolByRVA(
                 Rva,
-                SymTagPublicSymbol,
+                SymTagFunction,
                 DiaSymbol.Put());
+
+            if (SUCCEEDED(Hr) && DiaSymbol != nullptr)
+            {
+                auto Info = BuildSymbolInfo(
+                    *Loaded,
+                    DiaSymbol,
+                    SymbolKind::Function,
+                    SymTagFunction);
+
+                if (Info.HasValue())
+                {
+                    const U64 Begin = Info.Value.Address;
+                    const U64 End =
+                        Info.Value.Size != 0 ?
+                        Begin + Info.Value.Size :
+                        Begin;
+
+                    if (Info.Value.Size == 0 ||
+                        (Address >= Begin && Address < End))
+                    {
+                        return Info;
+                    }
+                }
+            }
         }
 
-        if (FAILED(Hr) || DiaSymbol == nullptr)
+        //
+        // 2. Exact data/public/label match.
+        //
+        for (const DiaSymbolTagPolicy& Policy : g_DiaSymbolSearchTags)
         {
-            return Expected<SymbolInfo>::Failure(
-                DebugError::Failure(
-                    ErrorCode::SymbolFailure,
-                    L"No symbol found for address."));
+            if (Policy.Tag == SymTagFunction)
+            {
+                continue;
+            }
+
+            ComPtr<IDiaSymbol> DiaSymbol;
+
+            HRESULT Hr = Loaded->Session->findSymbolByRVA(
+                Rva,
+                Policy.Tag,
+                DiaSymbol.Put());
+
+            if (FAILED(Hr) || DiaSymbol == nullptr)
+            {
+                continue;
+            }
+
+            auto Info = BuildSymbolInfo(
+                *Loaded,
+                DiaSymbol,
+                Policy.Kind,
+                Policy.Tag);
+
+            if (!Info.HasValue())
+            {
+                continue;
+            }
+
+            if (Info.Value.Address == Address ||
+                (Info.Value.Size != 0 &&
+                    Address >= Info.Value.Address &&
+                    Address < Info.Value.Address + Info.Value.Size))
+            {
+                return Info;
+            }
         }
 
-        auto Name = GetSymbolName(DiaSymbol);
-        if (!Name.HasValue())
-        {
-            return Expected<SymbolInfo>::Failure(Name.Error);
-        }
-
-        auto SymbolRva = GetSymbolRva(DiaSymbol);
-        if (!SymbolRva.HasValue())
-        {
-            return Expected<SymbolInfo>::Failure(SymbolRva.Error);
-        }
-
-        auto Length = GetSymbolLength(DiaSymbol);
-
-        SymbolInfo Info{};
-        Info.ModuleId = Loaded->Module.Id;
-        Info.Name = Name.Value;
-        Info.Address = Loaded->Module.BaseAddress + SymbolRva.Value;
-
-        if (Length.HasValue() && Length.Value <= 0xffffffffull)
-        {
-            Info.Size = static_cast<U32>(Length.Value);
-        }
-
-        return Expected<SymbolInfo>::Success(std::move(Info));
+        return Expected<SymbolInfo>::Failure(
+            DebugError::Failure(
+                ErrorCode::SymbolFailure,
+                L"No symbol found for address."));
     }
 
     Expected<SymbolInfo>
@@ -209,52 +321,48 @@ namespace VSGDBCore
     {
         for (const LoadedModule& Loaded : LoadedModules)
         {
-            ComPtr<IDiaEnumSymbols> EnumSymbols;
-
-            HRESULT Hr = Loaded.GlobalScope->findChildren(
-                SymTagFunction,
-                Name.c_str(),
-                nsCaseInsensitive,
-                EnumSymbols.Put());
-
-            if (FAILED(Hr) || EnumSymbols == nullptr)
+            for (const DiaSymbolTagPolicy& Policy : g_DiaSymbolSearchTags)
             {
-                continue;
+                ComPtr<IDiaEnumSymbols> EnumSymbols;
+
+                HRESULT Hr = Loaded.GlobalScope->findChildren(
+                    Policy.Tag,
+                    Name.c_str(),
+                    nsCaseInsensitive,
+                    EnumSymbols.Put());
+
+                if (FAILED(Hr) || EnumSymbols == nullptr)
+                {
+                    continue;
+                }
+
+                for (;;)
+                {
+                    ComPtr<IDiaSymbol> DiaSymbol;
+                    ULONG Fetched = 0;
+
+                    Hr = EnumSymbols->Next(
+                        1,
+                        DiaSymbol.Put(),
+                        &Fetched);
+
+                    if (FAILED(Hr) || Fetched == 0 || DiaSymbol == nullptr)
+                    {
+                        break;
+                    }
+
+                    auto Info = BuildSymbolInfo(
+                        Loaded,
+                        DiaSymbol,
+                        Policy.Kind,
+                        Policy.Tag);
+
+                    if (Info.HasValue())
+                    {
+                        return Info;
+                    }
+                }
             }
-
-            ComPtr<IDiaSymbol> DiaSymbol;
-            ULONG Fetched = 0;
-
-            Hr = EnumSymbols->Next(
-                1,
-                DiaSymbol.Put(),
-                &Fetched);
-
-            if (FAILED(Hr) || Fetched == 0 || DiaSymbol == nullptr)
-            {
-                continue;
-            }
-
-            auto SymbolName = GetSymbolName(DiaSymbol);
-            auto SymbolRva = GetSymbolRva(DiaSymbol);
-            auto Length = GetSymbolLength(DiaSymbol);
-
-            if (!SymbolName.HasValue() || !SymbolRva.HasValue())
-            {
-                continue;
-            }
-
-            SymbolInfo Info{};
-            Info.ModuleId = Loaded.Module.Id;
-            Info.Name = SymbolName.Value;
-            Info.Address = Loaded.Module.BaseAddress + SymbolRva.Value;
-
-            if (Length.HasValue() && Length.Value <= 0xffffffffull)
-            {
-                Info.Size = static_cast<U32>(Length.Value);
-            }
-
-            return Expected<SymbolInfo>::Success(std::move(Info));
         }
 
         return Expected<SymbolInfo>::Failure(
@@ -316,22 +424,92 @@ namespace VSGDBCore
 
     Expected<U32>
         DiaSymbolManager::GetSymbolRva(
-            IDiaSymbol* Symbol)
+            IDiaSymbol* Symbol) const
     {
         DWORD Rva = 0;
 
         HRESULT Hr = Symbol->get_relativeVirtualAddress(&Rva);
 
-        if (FAILED(Hr))
+        if (SUCCEEDED(Hr) && Rva != 0)
         {
-            return Expected<U32>::Failure(
-                HResultToDebugError(
-                    Hr,
-                    ErrorCode::SymbolFailure,
-                    L"Failed to get symbol RVA."));
+            return Expected<U32>::Success(
+                static_cast<U32>(Rva));
         }
 
-        return Expected<U32>::Success(static_cast<U32>(Rva));
+        ULONGLONG Va = 0;
+
+        Hr = Symbol->get_virtualAddress(&Va);
+
+        if (SUCCEEDED(Hr) && Va != 0)
+        {
+            //
+            // We cannot convert VA to RVA here unless we know module base.
+            // Prefer handling this in BuildSymbolInfo if needed.
+            //
+        }
+
+        DWORD LocationType = 0;
+        Hr = Symbol->get_locationType(&LocationType);
+
+        if (SUCCEEDED(Hr))
+        {
+            //
+            // LocIsStatic usually means an addressable global/static.
+            // Other location types may be register-relative/local/etc.
+            // Those are not valid expression atoms without a frame context.
+            //
+        }
+
+        return Expected<U32>::Failure(
+            DebugError::Failure(
+                ErrorCode::SymbolFailure,
+                L"Symbol has no RVA"));
+    }
+
+    Expected<U64>
+        DiaSymbolManager::GetSymbolRuntimeAddress(
+            const LoadedModule& Loaded,
+            IDiaSymbol* Symbol) const
+    {
+        DWORD Rva = 0;
+
+        HRESULT Hr = Symbol->get_relativeVirtualAddress(&Rva);
+
+        if (SUCCEEDED(Hr) && Rva != 0)
+        {
+            return Expected<U64>::Success(
+                Loaded.Module.BaseAddress + static_cast<U64>(Rva));
+        }
+
+        ULONGLONG Va = 0;
+
+        Hr = Symbol->get_virtualAddress(&Va);
+
+        if (SUCCEEDED(Hr) && Va != 0)
+        {
+            //
+            // DIA VA may already include load address if put_loadAddress()
+            // was used. Accept it if it falls inside the loaded module.
+            //
+            const U64 RuntimeVa = static_cast<U64>(Va);
+
+            if (RuntimeVa >= Loaded.Module.BaseAddress &&
+                (Loaded.Module.Size == 0 ||
+                    RuntimeVa < Loaded.Module.BaseAddress + Loaded.Module.Size))
+            {
+                return Expected<U64>::Success(RuntimeVa);
+            }
+
+            //
+            // Some DIA data may report image-base-relative VA. If needed,
+            // handle that later.
+            //
+        }
+
+        return Expected<U64>::Failure(
+            DebugError::Failure(
+                ErrorCode::SymbolFailure,
+                L"Symbol has no runtime address"));
     }
 
     Expected<U64>
@@ -542,71 +720,63 @@ namespace VSGDBCore
                     L"Module symbols were not loaded"));
         }
 
-        ComPtr<IDiaEnumSymbols> EnumSymbols;
-
-        HRESULT Hr = Loaded->GlobalScope->findChildren(
-            SymTagFunction,
-            nullptr,
-            nsNone,
-            EnumSymbols.Put());
-
-        if (FAILED(Hr) || EnumSymbols == nullptr)
-        {
-            return Expected<std::vector<SymbolInfo>>::Failure(
-                HResultToDebugError(
-                    Hr,
-                    ErrorCode::SymbolFailure,
-                    L"Failed to enumerate function symbols"));
-        }
-
         std::vector<SymbolInfo> Symbols;
 
-        for (;;)
+        for (const DiaSymbolTagPolicy& Policy : g_DiaSymbolSearchTags)
         {
-            ComPtr<IDiaSymbol> DiaSymbol;
-            ULONG Fetched = 0;
+            ComPtr<IDiaEnumSymbols> EnumSymbols;
 
-            Hr = EnumSymbols->Next(
-                1,
-                DiaSymbol.Put(),
-                &Fetched);
+            HRESULT Hr = Loaded->GlobalScope->findChildren(
+                Policy.Tag,
+                nullptr,
+                nsNone,
+                EnumSymbols.Put());
 
-            if (FAILED(Hr))
-            {
-                return Expected<std::vector<SymbolInfo>>::Failure(
-                    HResultToDebugError(
-                        Hr,
-                        ErrorCode::SymbolFailure,
-                        L"Failed to enumerate next symbol"));
-            }
-
-            if (Fetched == 0 || DiaSymbol == nullptr)
-            {
-                break;
-            }
-
-            auto Name = GetSymbolName(DiaSymbol);
-            auto Rva = GetSymbolRva(DiaSymbol);
-            auto Length = GetSymbolLength(DiaSymbol);
-
-            if (!Name.HasValue() || !Rva.HasValue())
+            if (FAILED(Hr) || EnumSymbols == nullptr)
             {
                 continue;
             }
 
-            SymbolInfo Info{};
-            Info.ModuleId = Loaded->Module.Id;
-            Info.Name = std::move(Name.Value);
-            Info.Address = Loaded->Module.BaseAddress + Rva.Value;
-
-            if (Length.HasValue() &&
-                Length.Value <= 0xffffffffull)
+            for (;;)
             {
-                Info.Size = static_cast<U32>(Length.Value);
-            }
+                ComPtr<IDiaSymbol> DiaSymbol;
+                ULONG Fetched = 0;
 
-            Symbols.push_back(std::move(Info));
+                Hr = EnumSymbols->Next(
+                    1,
+                    DiaSymbol.Put(),
+                    &Fetched);
+
+                if (FAILED(Hr))
+                {
+                    return Expected<std::vector<SymbolInfo>>::Failure(
+                        HResultToDebugError(
+                            Hr,
+                            ErrorCode::SymbolFailure,
+                            L"Failed to enumerate DIA symbols"));
+                }
+
+                if (Fetched == 0 || DiaSymbol == nullptr)
+                {
+                    break;
+                }
+
+                auto Info = BuildSymbolInfo(
+                    *Loaded,
+                    DiaSymbol,
+                    Policy.Kind,
+                    Policy.Tag);
+
+                if (!Info.HasValue())
+                {
+                    continue;
+                }
+
+                Symbols.push_back(std::move(Info.Value));
+            }
         }
+
+        DeduplicateSymbols(Symbols);
 
         std::sort(
             Symbols.begin(),
@@ -618,11 +788,52 @@ namespace VSGDBCore
                     return Left.Address < Right.Address;
                 }
 
+                if (Left.Kind != Right.Kind)
+                {
+                    return static_cast<U32>(Left.Kind) <
+                        static_cast<U32>(Right.Kind);
+                }
+
                 return Left.Name < Right.Name;
             });
 
         return Expected<std::vector<SymbolInfo>>::Success(
             std::move(Symbols));
+    }
+
+    Expected<SymbolInfo>
+        DiaSymbolManager::BuildSymbolInfo(
+            const LoadedModule& Loaded,
+            IDiaSymbol* DiaSymbol,
+            SymbolKind Kind,
+            enum SymTagEnum NativeTag) const
+    {
+        auto SymbolName = GetSymbolName(DiaSymbol);
+        auto Address = GetSymbolRuntimeAddress(Loaded, DiaSymbol);
+        auto Length = GetSymbolLength(DiaSymbol);
+
+        if (!SymbolName.HasValue() || !Address.HasValue())
+        {
+            return Expected<SymbolInfo>::Failure(
+                DebugError::Failure(
+                    ErrorCode::SymbolFailure,
+                    L"DIA symbol has no usable name or address"));
+        }
+
+        SymbolInfo Info{};
+        Info.ModuleId = Loaded.Module.Id;
+        Info.Name = std::move(SymbolName.Value);
+        Info.Address = Address.Value;
+        Info.Kind = Kind;
+        Info.NativeTag = static_cast<U32>(NativeTag);
+
+        if (Length.HasValue() &&
+            Length.Value <= 0xffffffffull)
+        {
+            Info.Size = static_cast<U32>(Length.Value);
+        }
+
+        return Expected<SymbolInfo>::Success(std::move(Info));
     }
 }
 

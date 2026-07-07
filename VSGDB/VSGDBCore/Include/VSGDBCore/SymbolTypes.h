@@ -9,6 +9,15 @@ namespace VSGDBCore
 {
     using SymbolId = U32;
 
+    enum class SymbolKind
+    {
+        Unknown,
+        Function,
+        PublicSymbol,
+        Data,
+        Label
+    };
+
     struct SymbolInfo
     {
         SymbolId Id = 0;
@@ -25,6 +34,9 @@ namespace VSGDBCore
         // Size can be zero if unknown.
         //
         U32 Size = 0;
+
+        SymbolKind Kind = SymbolKind::Unknown;
+        U32 NativeTag = 0;
     };
 
     struct SourceLocation

@@ -4,6 +4,7 @@
 #include <VSGDBCore/IDisassembler.h>
 #include <VSGDBCore/IModuleManager.h>
 #include <VSGDBCore/ISymbolManager.h>
+#include <VSGDBCore/IStackWalker.h>
 
 #include "DebugTextFormatter.h"
 #include "SymbolQuery.h"
@@ -31,20 +32,25 @@ public:
         VSGDBCore::GdbRemoteTarget& Target,
         std::unique_ptr<VSGDBCore::IDisassembler> Disassembler,
         std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager,
-        std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager);
+        std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager,
+        std::unique_ptr<VSGDBCore::IStackWalker> StackWalker);
 
     int Run();
 
     bool RequestBreakFromConsoleControlHandler();
 
-private:
     bool ProcessLine(
         const std::wstring& Line);
+
+private:
 
     bool ExecuteCommand(
         const std::vector<std::wstring>& Arguments);
 
     bool ExecuteHelp(
+        const std::vector<std::wstring>& Arguments);
+
+    bool ExecuteScript(
         const std::vector<std::wstring>& Arguments);
 
     bool ExecuteQuit(
@@ -152,6 +158,10 @@ private:
         const VSGDBCore::SymbolInfo& Symbol,
         const VSGDBCore::ModuleInfo* Module) const;
 
+    bool ExecuteStackTrace(
+        const std::vector<std::wstring>& Arguments,
+        bool Verbose);
+
 private:
     VSGDBCore::GdbRemoteTarget& Target;
     VSGDBCore::U32 CurrentCpuId = 0;
@@ -165,6 +175,9 @@ private:
     std::unique_ptr<VSGDBCore::IDisassembler> Disassembler;
     std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager;
     std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager;
+    std::unique_ptr<VSGDBCore::IStackWalker> StackWalker;
 
     std::unique_ptr<DebugTextFormatter> Formatter;
+
+    VSGDBCore::U32 ScriptDepth = 0;
 };

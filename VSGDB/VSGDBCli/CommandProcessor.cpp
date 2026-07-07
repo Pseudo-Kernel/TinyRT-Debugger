@@ -7,7 +7,9 @@
 #include "PagingPrinter.h"
 #include "PageFaultPrinter.h"
 #include "SymbolQuery.h"
+#include "CommandScript.h"
 
+#include <VSGDBCore/SymbolTypes.h>
 #include <VSGDBCore/X64Paging.h>
 #include <cstdio>
 #include <cwctype>
@@ -15,13 +17,15 @@
 #include <iostream>
 #include <Windows.h>
 
+static constexpr VSGDBCore::U32 MaxCommandScriptDepth = 8;
+
 static constexpr VSGDBCore::U32 DefaultDisassemblyBytes = 0x80;
 static constexpr VSGDBCore::U32 MaxDisassemblyBytes = 0x1000;
 
 static constexpr VSGDBCore::U32 DefaultFunctionDisassemblyBytes = 0x100;
 static constexpr VSGDBCore::U32 MaxFunctionDisassemblyBytes = 0x1000;
 
-static constexpr size_t MaxSymbolSearchResults = 256;
+static constexpr size_t MaxSymbolSearchResults = 2048;
 
 
 static std::wstring
@@ -199,17 +203,32 @@ StartsWithCaseInsensitive(
     return true;
 }
 
+static const wchar_t*
+SymbolKindToString(
+    VSGDBCore::SymbolKind Kind)
+{
+    switch (Kind)
+    {
+    case VSGDBCore::SymbolKind::Function: return L"Func";
+    case VSGDBCore::SymbolKind::Data: return L"Data";
+    case VSGDBCore::SymbolKind::PublicSymbol: return L"Public";
+    case VSGDBCore::SymbolKind::Label: return L"Label";
+    default: return L"?";
+    }
+}
 
 
 CommandProcessor::CommandProcessor(
     VSGDBCore::GdbRemoteTarget& Target,
     std::unique_ptr<VSGDBCore::IDisassembler> Disassembler,
     std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager,
-    std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager) :
+    std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager,
+    std::unique_ptr<VSGDBCore::IStackWalker> StackWalker) :
     Target(Target),
     Disassembler(std::move(Disassembler)),
     ModuleManager(std::move(ModuleManager)),
     SymbolManager(std::move(SymbolManager)),
+    StackWalker(std::move(StackWalker)),
     Formatter()
 {
     Formatter = std::make_unique<DebugTextFormatter>(
@@ -298,6 +317,11 @@ CommandProcessor::ExecuteCommand(
     if (Command == L"help" || Command == L"?")
     {
         return ExecuteHelp(Arguments);
+    }
+
+    if (Command == L"script")
+    {
+        return ExecuteScript(Arguments);
     }
 
     if (Command == L"quit" || Command == L"exit" || Command == L"q")
@@ -410,6 +434,16 @@ CommandProcessor::ExecuteCommand(
         return ExecuteSourceLine(Arguments);
     }
 
+    if (Command == L"k")
+    {
+        return ExecuteStackTrace(Arguments, false);
+    }
+
+    if (Command == L"kb")
+    {
+        return ExecuteStackTrace(Arguments, true);
+    }
+
     std::wprintf(
         L"Unknown command: %s\n",
         Arguments[0].c_str());
@@ -426,6 +460,7 @@ CommandProcessor::ExecuteHelp(
     std::wprintf(
         L"Commands:\n"
         L"  help, ?              Show this help.\n"
+        L"  script <file>        Execute command script.\n"
         L"  quit, exit, q        Exit debugger.\n"
         L"  threads              List CPUs/vCPUs/threads.\n"
         L"  cpu                  Print current implicit CPU.\n"
@@ -450,9 +485,34 @@ CommandProcessor::ExecuteHelp(
         L"  .symload <module-id>            Load symbols for registered module.\n"
         L"  x <symbol-name|pattern>         Lookup or search symbols. Supports *, prefix*, *suffix, *contains*.\n"
         L"  line [expr]          Show source location for address.\n"
+        L"  k [max]              Show stack backtrace.\n"
+        L"  kb [max]             Show verbose stack backtrace.\n"
     );
 
     return true;
+}
+
+bool
+CommandProcessor::ExecuteScript(
+    const std::vector<std::wstring>& Arguments)
+{
+    if (Arguments.size() != 2)
+    {
+        std::wprintf(L"Usage: script <script-file>\n");
+        return false;
+    }
+
+    if (ScriptDepth >= MaxCommandScriptDepth)
+    {
+        std::wprintf(L"Command script nesting is too deep.\n");
+        return false;
+    }
+
+    ++ScriptDepth;
+    const bool Result = ExecuteCommandScript(*this, Arguments[1]);
+    --ScriptDepth;
+
+    return Result;
 }
 
 bool
@@ -2292,9 +2352,10 @@ CommandProcessor::PrintSymbolInfo(
     const VSGDBCore::ModuleInfo* Module) const
 {
     std::wprintf(
-        L"0x%016llx  %-48s",
+        L"0x%016llx  %-48s  %-6s",
         Symbol.Address,
-        Symbol.Name.c_str());
+        Symbol.Name.c_str(),
+        SymbolKindToString(Symbol.Kind));
 
     if (Symbol.Size != 0)
     {
@@ -2316,4 +2377,91 @@ CommandProcessor::PrintSymbolInfo(
     }
 
     std::wprintf(L"\n");
+}
+
+bool
+CommandProcessor::ExecuteStackTrace(
+    const std::vector<std::wstring>& Arguments,
+    bool Verbose)
+{
+    if (Arguments.size() > 2)
+    {
+        std::wprintf(L"Usage: %s [max-frames]\n",
+            Verbose ? L"kb" : L"k");
+        return false;
+    }
+
+    if (!StackWalker)
+    {
+        std::wprintf(L"No stack walker is available.\n");
+        return false;
+    }
+
+    VSGDBCore::StackWalkOptions Options{};
+
+    if (Arguments.size() == 2)
+    {
+        auto MaxFrames = EvaluateSimpleExpression(
+            Target,
+            CurrentCpuId,
+            Arguments[1],
+            nullptr);
+
+        if (!MaxFrames.HasValue() ||
+            MaxFrames.Value == 0 ||
+            MaxFrames.Value > 1024)
+        {
+            std::wprintf(
+                L"Invalid max frame count: %s\n",
+                Arguments[1].c_str());
+
+            return false;
+        }
+
+        Options.MaxFrames =
+            static_cast<VSGDBCore::U32>(MaxFrames.Value);
+    }
+
+    auto Frames = StackWalker->WalkStack(
+        Target,
+        CurrentCpuId,
+        Options);
+
+    if (!Frames.HasValue())
+    {
+        PrintDebugError(
+            L"Failed to walk stack",
+            Frames.Error);
+
+        return false;
+    }
+
+    for (const auto& Frame : Frames.Value)
+    {
+        if (!Verbose)
+        {
+            std::wprintf(
+                L"#%-2u  %s\n",
+                Frame.Index,
+                Formatter->FormatAddressInline(
+                    Frame.InstructionPointer).c_str());
+        }
+        else
+        {
+            std::wprintf(
+                L"#%-2u  RIP=%s  RBP=0x%016llx  RSP=0x%016llx  "
+                L"Establisher=0x%016llx  RetSlot=0x%016llx  RET=%s\n",
+                Frame.Index,
+                Formatter->FormatAddressInline(
+                    Frame.InstructionPointer).c_str(),
+                Frame.FramePointer,
+                Frame.StackPointer,
+                Frame.EstablisherFrame,
+                Frame.ReturnAddressLocation,
+                Formatter->FormatAddressInline(
+                    Frame.ReturnAddress).c_str());
+        }
+    }
+
+    return true;
 }
