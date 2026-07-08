@@ -8,6 +8,7 @@
 #include "PageFaultPrinter.h"
 #include "SymbolQuery.h"
 #include "CommandScript.h"
+#include "PeImageUtil.h"
 
 #include <VSGDBCore/SymbolTypes.h>
 #include <VSGDBCore/X64Paging.h>
@@ -1954,21 +1955,39 @@ CommandProcessor::ExecuteReload(
 
     VSGDBCore::U64 Size = 0;
 
-    if (Arguments.size() >= 4)
+    if (Arguments.size() == 4)
     {
-        auto ParsedSize = EvaluateSimpleExpression(
+        auto SizeResult = EvaluateSimpleExpression(
             Target,
             CurrentCpuId,
             Arguments[3],
-            SymbolManager.get());
+            nullptr);
 
-        if (!ParsedSize.HasValue())
+        if (!SizeResult.HasValue() || SizeResult.Value == 0)
         {
-            PrintDebugError(L"Invalid module size", ParsedSize.Error);
+            std::wprintf(
+                L"Invalid module size: %s\n",
+                Arguments[3].c_str());
+
             return false;
         }
 
-        Size = ParsedSize.Value;
+        Size = SizeResult.Value;
+    }
+    else
+    {
+        auto ImageSize = ReadPeSizeOfImage(ImagePath);
+
+        if (!ImageSize.HasValue())
+        {
+            PrintDebugError(
+                L"Failed to infer PE image size",
+                ImageSize.Error);
+
+            return false;
+        }
+
+        Size = ImageSize.Value;
     }
 
     VSGDBCore::ModuleInfo Module{};
@@ -1985,20 +2004,24 @@ CommandProcessor::ExecuteReload(
         return false;
     }
 
-    std::wprintf(
-        L"Added module %s, Id=%u, Base=0x%016llx",
-        Module.Name.c_str(),
-        ModuleId.Value,
-        Module.BaseAddress);
-
-    if (Module.Size != 0)
+    if (Arguments.size() == 4)
     {
         std::wprintf(
-            L", Size=0x%llx",
+            L"Added module %s, Id=%u, Base=0x%016llx, Size=0x%llx\n",
+            Module.Name.c_str(),
+            ModuleId.Value,
+            Module.BaseAddress,
             Module.Size);
     }
-
-    std::wprintf(L"\n");
+    else
+    {
+        std::wprintf(
+            L"Added module %s, Id=%u, Base=0x%016llx, Size=0x%llx (PE SizeOfImage)\n",
+            Module.Name.c_str(),
+            ModuleId.Value,
+            Module.BaseAddress,
+            Module.Size);
+    }
 
     return true;
 }

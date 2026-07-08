@@ -48,6 +48,9 @@
     <ClCompile Include="CommandScript.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PeImageUtil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommandProcessor.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CommandScript.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PeImageUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
