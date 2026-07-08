@@ -11,6 +11,11 @@ namespace VSGDBCore
         X64
     };
 
+    struct InstructionAddressReference
+    {
+        U64 Address = 0;
+    };
+
     struct DisassembledInstruction
     {
         U64 Address = 0;
@@ -24,6 +29,8 @@ namespace VSGDBCore
 
         bool HasBranchTarget = false;
         U64 BranchTarget = 0;
+
+        std::vector<InstructionAddressReference> AddressReferences;
     };
 
     class IDisassembler

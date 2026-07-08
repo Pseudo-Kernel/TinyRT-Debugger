@@ -111,6 +111,72 @@ namespace VSGDBCore
         return false;
     }
 
+    static void
+        CollectAddressReferences(
+            const ZydisDecodedInstruction& Instruction,
+            const ZydisDecodedOperand* Operands,
+            ZyanU64 RuntimeAddress,
+            DisassembledInstruction& Output)
+    {
+        for (ZyanU8 Index = 0; Index < Instruction.operand_count_visible; ++Index)
+        {
+            const ZydisDecodedOperand& Operand = Operands[Index];
+
+            //
+            // Branch targets are already handled separately.
+            //
+            if (Operand.type == ZYDIS_OPERAND_TYPE_IMMEDIATE &&
+                Operand.imm.is_relative)
+            {
+                continue;
+            }
+
+            if (Operand.type != ZYDIS_OPERAND_TYPE_MEMORY &&
+                Operand.type != ZYDIS_OPERAND_TYPE_IMMEDIATE)
+            {
+                continue;
+            }
+
+            ZyanU64 AbsoluteAddress = 0;
+
+            const ZyanStatus Status = ZydisCalcAbsoluteAddress(
+                &Instruction,
+                &Operand,
+                RuntimeAddress,
+                &AbsoluteAddress);
+
+            if (!ZYAN_SUCCESS(Status))
+            {
+                continue;
+            }
+
+            const U64 Reference =
+                static_cast<U64>(AbsoluteAddress);
+
+            //
+            // Avoid duplicate entries from unusual operand combinations.
+            //
+            bool Exists = false;
+
+            for (const InstructionAddressReference& Existing :
+                Output.AddressReferences)
+            {
+                if (Existing.Address == Reference)
+                {
+                    Exists = true;
+                    break;
+                }
+            }
+
+            if (!Exists)
+            {
+                InstructionAddressReference ReferenceInfo{};
+                ReferenceInfo.Address = Reference;
+                Output.AddressReferences.push_back(ReferenceInfo);
+            }
+        }
+    }
+
     ZydisDisassembler::ZydisDisassembler()
     {
         (void)SetArchitecture(ProcessorArchitecture::X64);
@@ -275,6 +341,12 @@ namespace VSGDBCore
                 Instruction.HasBranchTarget = true;
                 Instruction.BranchTarget = BranchTarget;
             }
+
+            CollectAddressReferences(
+                DecodedInstruction, 
+                DecodedOperands, 
+                CurrentAddress, 
+                Instruction);
 
             Instructions.push_back(std::move(Instruction));
 
