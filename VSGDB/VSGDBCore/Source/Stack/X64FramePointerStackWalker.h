@@ -1,6 +1,7 @@
 #pragma once
 
 #include <VSGDBCore/IStackWalker.h>
+#include <VSGDBCore/IDebugSession.h>
 
 namespace VSGDBCore
 {
@@ -8,7 +9,7 @@ namespace VSGDBCore
     {
     public:
         Expected<std::vector<StackFrame>> WalkStack(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             const StackWalkOptions& Options) override;
 

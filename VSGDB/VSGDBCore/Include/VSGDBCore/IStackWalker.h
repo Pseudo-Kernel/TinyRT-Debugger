@@ -7,7 +7,7 @@
 
 namespace VSGDBCore
 {
-    class IDebugTarget;
+    class IDebugSession;
 
     class IStackWalker
     {
@@ -15,7 +15,7 @@ namespace VSGDBCore
         virtual ~IStackWalker() = default;
 
         virtual Expected<std::vector<StackFrame>> WalkStack(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             const StackWalkOptions& Options) = 0;
     };

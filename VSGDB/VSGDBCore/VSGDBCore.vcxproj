@@ -21,7 +21,7 @@
   <ItemGroup>
     <ClInclude Include="Include\VSGDBCore\BreakpointTypes.h" />
     <ClInclude Include="Include\VSGDBCore\Components.h" />
-    <ClInclude Include="Include\VSGDBCore\DebugSession.h" />
+    <ClInclude Include="Include\VSGDBCore\DebugSessionTypes.h" />
     <ClInclude Include="Include\VSGDBCore\DisassemblyTypes.h" />
     <ClInclude Include="Include\VSGDBCore\GdbRemoteConnection.h" />
     <ClInclude Include="Include\VSGDBCore\GdbRemoteTarget.h" />
@@ -48,6 +48,7 @@
     <ClInclude Include="Include\VSGDBCore\X64UnwindTypes.h" />
     <ClInclude Include="Include\VSGDBCore\_DebugSessionConfig.h" />
     <ClInclude Include="Include\VSGDBCore\_IDebugEventSink.h" />
+    <ClInclude Include="Source\Core\DebugSession.h" />
     <ClInclude Include="Source\Disassembly\ZydisDisassembler.h" />
     <ClInclude Include="Source\Gdb\GdbPacket.h" />
     <ClInclude Include="Source\Gdb\GdbRegisterCodec.h" />

@@ -1,6 +1,6 @@
 #include "X64FramePointerStackWalker.h"
 
-#include <VSGDBCore/IDebugTarget.h>
+#include <VSGDBCore/IDebugSession.h>
 #include <VSGDBCore/RegisterContext.h>
 
 #include <cstring>
@@ -68,11 +68,11 @@ namespace VSGDBCore
 
     Expected<std::vector<StackFrame>>
         X64FramePointerStackWalker::WalkStack(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             const StackWalkOptions& Options)
     {
-        auto Registers = Target.GetRegisters(CpuId);
+        auto Registers = Session.GetRegisters(CpuId);
 
         if (!Registers.HasValue())
         {
@@ -109,7 +109,7 @@ namespace VSGDBCore
                 break;
             }
 
-            auto Bytes = Target.ReadVirtualMemory(
+            auto Bytes = Session.ReadVirtualMemory(
                 CpuId,
                 FramePointer,
                 16);

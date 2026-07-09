@@ -220,12 +220,12 @@ SymbolKindToString(
 
 
 CommandProcessor::CommandProcessor(
-    VSGDBCore::GdbRemoteTarget& Target,
+    std::unique_ptr<VSGDBCore::IDebugSession> Session,
     std::unique_ptr<VSGDBCore::IDisassembler> Disassembler,
     std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager,
     std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager,
     std::unique_ptr<VSGDBCore::IStackWalker> StackWalker) :
-    Target(Target),
+    Session(std::move(Session)),
     Disassembler(std::move(Disassembler)),
     ModuleManager(std::move(ModuleManager)),
     SymbolManager(std::move(SymbolManager)),
@@ -287,7 +287,7 @@ CommandProcessor::RequestBreakFromConsoleControlHandler()
     // Send raw 0x03 to the GDB remote target.
     // Do not print here. Keep the console control handler path minimal.
     //
-    auto Error = Target.BreakExecution();
+    auto Error = Session->BreakExecution();
     (void)Error;
 
     return true;
@@ -538,7 +538,7 @@ CommandProcessor::ExecuteThreads(
         return false;
     }
 
-    auto Threads = Target.EnumerateThreads();
+    auto Threads = Session->EnumerateThreads();
     if (!Threads.HasValue())
     {
         PrintDebugError(L"EnumerateThreads failed", Threads.Error);
@@ -586,7 +586,7 @@ CommandProcessor::ExecuteCpu(
         return false;
     }
 
-    auto Threads = Target.EnumerateThreads();
+    auto Threads = Session->EnumerateThreads();
     if (!Threads.HasValue())
     {
         PrintDebugError(L"EnumerateThreads failed", Threads.Error);
@@ -632,7 +632,7 @@ CommandProcessor::ExecuteRegisters(
         return false;
     }
 
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
     if (!Registers.HasValue())
     {
         PrintDebugError(L"GetRegisters failed", Registers.Error);
@@ -675,7 +675,7 @@ CommandProcessor::ExecuteDumpVirtualBytes(
     }
 
     auto Address = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[1],
         SymbolManager.get());
@@ -704,7 +704,7 @@ CommandProcessor::ExecuteDumpVirtualBytes(
         return false;
     }
 
-    auto Bytes = Target.ReadVirtualMemory(
+    auto Bytes = Session->ReadVirtualMemory(
         CurrentCpuId,
         Address.Value,
         static_cast<VSGDBCore::U32>(Size64));
@@ -738,7 +738,7 @@ CommandProcessor::ExecuteDumpPhysicalBytes(
     }
 
     auto Address = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[1],
         SymbolManager.get());
@@ -767,7 +767,7 @@ CommandProcessor::ExecuteDumpPhysicalBytes(
         return false;
     }
 
-    auto Bytes = Target.ReadPhysicalMemory(
+    auto Bytes = Session->ReadPhysicalMemory(
         Address.Value,
         static_cast<VSGDBCore::U32>(Size64));
 
@@ -795,7 +795,7 @@ CommandProcessor::ExecutePte(
     }
 
     auto VirtualAddress = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[1],
         SymbolManager.get());
@@ -809,7 +809,7 @@ CommandProcessor::ExecutePte(
         return false;
     }
 
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
     if (!Registers.HasValue())
     {
         PrintDebugError(
@@ -826,7 +826,7 @@ CommandProcessor::ExecutePte(
     Paging.Efer = Registers.Value.Efer;
 
     auto Translation = VSGDBCore::TranslateX64VirtualAddress(
-        Target,
+        *Session,
         Paging,
         VirtualAddress.Value);
 
@@ -854,7 +854,7 @@ CommandProcessor::ExecutePageFault(
     }
 
     auto VirtualAddress = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[1],
         SymbolManager.get());
@@ -869,7 +869,7 @@ CommandProcessor::ExecutePageFault(
     }
 
     auto ErrorCode = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[2],
         SymbolManager.get());
@@ -883,7 +883,7 @@ CommandProcessor::ExecutePageFault(
         return false;
     }
 
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
     if (!Registers.HasValue())
     {
         PrintDebugError(
@@ -900,7 +900,7 @@ CommandProcessor::ExecutePageFault(
     Paging.Efer = Registers.Value.Efer;
 
     auto Translation = VSGDBCore::TranslateX64VirtualAddress(
-        Target,
+        *Session,
         Paging,
         VirtualAddress.Value);
 
@@ -935,14 +935,14 @@ CommandProcessor::ExecuteStep(
         return false;
     }
 
-    auto Error = Target.StepInto(CurrentCpuId);
+    auto Error = Session->StepInto(CurrentCpuId);
     if (!Error.IsSuccess())
     {
         PrintDebugError(L"StepInto failed", Error);
         return false;
     }
 
-    auto Event = Target.GetLastEvent();
+    auto Event = Session->GetLastEvent();
     if (Event.HasValue())
     {
         PrintStopEvent(Event.Value);
@@ -982,7 +982,7 @@ CommandProcessor::ExecuteBreakpointSet(
     }
 
     auto Address = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[1],
         SymbolManager.get());
@@ -1011,7 +1011,7 @@ CommandProcessor::ExecuteBreakpointSet(
         }
     }
 
-    auto SetResult = Target.SetBreakpoint(
+    auto SetResult = Session->SetBreakpoint(
         VSGDBCore::BreakpointKind::Software,
         Address.Value,
         1);
@@ -1137,7 +1137,7 @@ CommandProcessor::ExecuteBreakpointClear(
             return false;
         }
 
-        auto Error = Target.DeleteBreakpoint(BreakpointId);
+        auto Error = Session->DeleteBreakpoint(BreakpointId);
 
         if (!Error.IsSuccess())
         {
@@ -1170,7 +1170,7 @@ CommandProcessor::TryUpdateCurrentCpuFromStopEvent(
         return false;
     }
 
-    auto Threads = Target.EnumerateThreads();
+    auto Threads = Session->EnumerateThreads();
     if (!Threads.HasValue())
     {
         return false;
@@ -1203,7 +1203,7 @@ CommandProcessor::ReportStopReason(
         return;
     }
 
-    auto Threads = Target.EnumerateThreads();
+    auto Threads = Session->EnumerateThreads();
     if (!Threads.HasValue())
     {
         return;
@@ -1229,7 +1229,7 @@ CommandProcessor::ReportStopReason(
         return;
     }
 
-    auto Registers = Target.GetRegisters(StoppedCpuId);
+    auto Registers = Session->GetRegisters(StoppedCpuId);
     if (!Registers.HasValue())
     {
         return;
@@ -1293,7 +1293,7 @@ CommandProcessor::ClearAllKnownBreakpoints()
             continue;
         }
 
-        auto Error = Target.DeleteBreakpoint(Breakpoint.Id);
+        auto Error = Session->DeleteBreakpoint(Breakpoint.Id);
         if (!Error.IsSuccess())
         {
             std::wprintf(
@@ -1319,7 +1319,7 @@ CommandProcessor::ExecuteBreakpointClearAddress(
     }
 
     auto Address = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[1],
         SymbolManager.get());
@@ -1333,7 +1333,7 @@ CommandProcessor::ExecuteBreakpointClearAddress(
         return false;
     }
 
-    auto Error = Target.DeleteBreakpointByAddress(
+    auto Error = Session->DeleteBreakpointByAddress(
         VSGDBCore::BreakpointKind::Software,
         Address.Value,
         1);
@@ -1357,7 +1357,7 @@ CommandProcessor::ContinueAllAndReportStop()
     BreakRequested.store(false, std::memory_order_release);
     TargetRunning.store(true, std::memory_order_release);
 
-    auto Error = Target.ContinueAll();
+    auto Error = Session->ContinueAll();
 
     TargetRunning.store(false, std::memory_order_release);
 
@@ -1370,7 +1370,7 @@ CommandProcessor::ContinueAllAndReportStop()
         return false;
     }
 
-    auto Event = Target.GetLastEvent();
+    auto Event = Session->GetLastEvent();
     if (Event.HasValue())
     {
         PrintStopEvent(Event.Value);
@@ -1428,7 +1428,7 @@ CommandProcessor::ExecuteGoFromBreakpoint(
         return false;
     }
 
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
     if (!Registers.HasValue())
     {
         PrintDebugError(L"GetRegisters failed", Registers.Error);
@@ -1450,7 +1450,7 @@ CommandProcessor::ExecuteGoFromBreakpoint(
         Breakpoint->Id,
         Breakpoint->Address);
 
-    auto RemoveError = Target.RemoveBreakpointFromTarget(
+    auto RemoveError = Session->RemoveBreakpointFromTarget(
         Breakpoint->Id);
 
     if (!RemoveError.IsSuccess())
@@ -1462,7 +1462,7 @@ CommandProcessor::ExecuteGoFromBreakpoint(
 
     Breakpoint->Inserted = false;
 
-    auto StepError = Target.StepInto(CurrentCpuId);
+    auto StepError = Session->StepInto(CurrentCpuId);
     if (!StepError.IsSuccess())
     {
         PrintDebugError(
@@ -1472,7 +1472,7 @@ CommandProcessor::ExecuteGoFromBreakpoint(
         //
         // Best-effort restore.
         //
-        auto RestoreError = Target.InsertBreakpointIntoTarget(
+        auto RestoreError = Session->InsertBreakpointIntoTarget(
             Breakpoint->Id);
 
         if (!RestoreError.IsSuccess())
@@ -1490,14 +1490,14 @@ CommandProcessor::ExecuteGoFromBreakpoint(
         return false;
     }
 
-    auto StepEvent = Target.GetLastEvent();
+    auto StepEvent = Session->GetLastEvent();
     if (StepEvent.HasValue())
     {
         PrintStopEvent(StepEvent.Value);
         TryUpdateCurrentCpuFromStopEvent(StepEvent.Value);
     }
 
-    auto RestoreError = Target.InsertBreakpointIntoTarget(
+    auto RestoreError = Session->InsertBreakpointIntoTarget(
         Breakpoint->Id);
 
     if (!RestoreError.IsSuccess())
@@ -1523,7 +1523,7 @@ CommandProcessor::ExecuteGoFromBreakpoint(
 bool
 CommandProcessor::StepOverCurrentSoftwareBreakpointIfNeeded()
 {
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
     if (!Registers.HasValue())
     {
         PrintDebugError(L"GetRegisters failed", Registers.Error);
@@ -1552,7 +1552,7 @@ CommandProcessor::StepOverCurrentSoftwareBreakpointIfNeeded()
         BreakpointId,
         BreakpointAddress);
 
-    auto RemoveError = Target.RemoveBreakpointFromTarget(BreakpointId);
+    auto RemoveError = Session->RemoveBreakpointFromTarget(BreakpointId);
     if (!RemoveError.IsSuccess())
     {
         PrintDebugError(L"RemoveBreakpointFromTarget failed", RemoveError);
@@ -1561,14 +1561,14 @@ CommandProcessor::StepOverCurrentSoftwareBreakpointIfNeeded()
 
     Breakpoint->Inserted = false;
 
-    auto StepError = Target.StepInto(CurrentCpuId);
+    auto StepError = Session->StepInto(CurrentCpuId);
     if (!StepError.IsSuccess())
     {
         PrintDebugError(
             L"StepInto failed while stepping over breakpoint",
             StepError);
 
-        auto RestoreError = Target.InsertBreakpointIntoTarget(BreakpointId);
+        auto RestoreError = Session->InsertBreakpointIntoTarget(BreakpointId);
         if (!RestoreError.IsSuccess())
         {
             std::wprintf(
@@ -1590,13 +1590,13 @@ CommandProcessor::StepOverCurrentSoftwareBreakpointIfNeeded()
     // However, update CurrentCpuId just in case QEMU reports the step stop
     // using a normalized/alternate thread ID.
     //
-    auto StepEvent = Target.GetLastEvent();
+    auto StepEvent = Session->GetLastEvent();
     if (StepEvent.HasValue())
     {
         TryUpdateCurrentCpuFromStopEvent(StepEvent.Value);
     }
 
-    auto RestoreError = Target.InsertBreakpointIntoTarget(BreakpointId);
+    auto RestoreError = Session->InsertBreakpointIntoTarget(BreakpointId);
     if (!RestoreError.IsSuccess())
     {
         PrintDebugError(
@@ -1636,7 +1636,7 @@ CommandProcessor::ExecuteDisassemble(
     }
 
     auto Address = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         AddressExpression,
         SymbolManager.get());
@@ -1655,7 +1655,7 @@ CommandProcessor::ExecuteDisassemble(
     if (Arguments.size() == 3)
     {
         auto EvalResult = EvaluateSimpleExpression(
-            Target,
+            *Session,
             CurrentCpuId,
             Arguments[2],
             nullptr);
@@ -1690,7 +1690,7 @@ CommandProcessor::ExecuteDisassemble(
 
     VSGDBCore::U64 CurrentRip = 0;
 
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
 
     if (Registers.HasValue())
     {
@@ -1715,7 +1715,7 @@ CommandProcessor::ExecuteDisassembleFunction(
         return false;
     }
 
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
 
     if (!Registers.HasValue())
     {
@@ -1728,7 +1728,7 @@ CommandProcessor::ExecuteDisassembleFunction(
     if (Arguments.size() == 2)
     {
         auto Evaluated = EvaluateSimpleExpression(
-            Target,
+            *Session,
             CurrentCpuId,
             Arguments[1],
             SymbolManager.get());
@@ -1789,7 +1789,7 @@ CommandProcessor::ExecuteDisassembleBackwardWindow(
         return false;
     }
 
-    auto Registers = Target.GetRegisters(CurrentCpuId);
+    auto Registers = Session->GetRegisters(CurrentCpuId);
 
     if (!Registers.HasValue())
     {
@@ -1803,7 +1803,7 @@ CommandProcessor::ExecuteDisassembleBackwardWindow(
     if (Arguments.size() >= 2)
     {
         auto Evaluated = EvaluateSimpleExpression(
-            Target,
+            *Session,
             CurrentCpuId,
             Arguments[1],
             SymbolManager.get());
@@ -1820,7 +1820,7 @@ CommandProcessor::ExecuteDisassembleBackwardWindow(
     if (Arguments.size() >= 3)
     {
         auto EvaluatedSize = EvaluateSimpleExpression(
-            Target,
+            *Session,
             CurrentCpuId,
             Arguments[2],
             SymbolManager.get());
@@ -1942,7 +1942,7 @@ CommandProcessor::ExecuteReload(
     const std::wstring& ImagePath = Arguments[1];
 
     auto Base = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[2],
         SymbolManager.get());
@@ -1958,7 +1958,7 @@ CommandProcessor::ExecuteReload(
     if (Arguments.size() == 4)
     {
         auto SizeResult = EvaluateSimpleExpression(
-            Target,
+            *Session,
             CurrentCpuId,
             Arguments[3],
             nullptr);
@@ -2039,7 +2039,7 @@ CommandProcessor::ExecuteSymbolLoad(
     VSGDBCore::U64 ModuleIdValue = 0;
 
     auto ParsedId = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         Arguments[1],
         SymbolManager.get());
@@ -2164,7 +2164,7 @@ CommandProcessor::DisassembleRange(
     const VSGDBCore::U32 ReadSize =
         ByteCount + MaxInstructionLength;
 
-    auto Bytes = Target.ReadVirtualMemory(
+    auto Bytes = Session->ReadVirtualMemory(
         CurrentCpuId,
         StartAddress,
         ReadSize);
@@ -2239,7 +2239,7 @@ CommandProcessor::ExecuteSourceLine(
     }
 
     auto Address = EvaluateSimpleExpression(
-        Target,
+        *Session,
         CurrentCpuId,
         AddressExpression,
         SymbolManager.get());
@@ -2425,7 +2425,7 @@ CommandProcessor::ExecuteStackTrace(
     if (Arguments.size() == 2)
     {
         auto MaxFrames = EvaluateSimpleExpression(
-            Target,
+            *Session,
             CurrentCpuId,
             Arguments[1],
             nullptr);
@@ -2446,7 +2446,7 @@ CommandProcessor::ExecuteStackTrace(
     }
 
     auto Frames = StackWalker->WalkStack(
-        Target,
+        *Session,
         CurrentCpuId,
         Options);
 

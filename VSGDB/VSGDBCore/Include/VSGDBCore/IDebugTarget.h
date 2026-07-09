@@ -36,7 +36,6 @@ namespace VSGDBCore
         std::wstring Host = L"127.0.0.1";
         U16 Port = 1234;
         U32 DefaultCpuId = 0;
-        bool UseQemuPhysicalMemoryMode = false;
     };
 
     class IDebugTarget

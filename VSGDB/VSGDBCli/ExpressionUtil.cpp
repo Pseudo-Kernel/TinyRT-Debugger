@@ -44,13 +44,13 @@ ParseU64(
 
 static VSGDBCore::Expected<VSGDBCore::U64>
 EvaluateRegisterName(
-    VSGDBCore::GdbRemoteTarget& Target,
+    VSGDBCore::IDebugSession& Session,
     VSGDBCore::U32 CpuId,
     const std::wstring& Name)
 {
     const std::wstring LowerName = ToLowerString(Name);
 
-    auto Registers = Target.GetRegisters(CpuId);
+    auto Registers = Session.GetRegisters(CpuId);
     if (!Registers.HasValue())
     {
         return VSGDBCore::Expected<VSGDBCore::U64>::Failure(
@@ -107,7 +107,7 @@ EvaluateRegisterName(
 
 static VSGDBCore::Expected<VSGDBCore::U64>
 EvaluateAtom(
-    VSGDBCore::GdbRemoteTarget& Target,
+    VSGDBCore::IDebugSession& Session,
     VSGDBCore::U32 CpuId,
     const std::wstring& Atom,
     const VSGDBCore::ISymbolManager* SymbolManager)
@@ -120,7 +120,7 @@ EvaluateAtom(
     }
 
     auto Result = EvaluateRegisterName(
-        Target,
+        Session,
         CpuId,
         Atom);
     if (Result.HasValue())
@@ -146,7 +146,7 @@ EvaluateAtom(
 
 VSGDBCore::Expected<VSGDBCore::U64>
 EvaluateSimpleExpression(
-    VSGDBCore::GdbRemoteTarget& Target,
+    VSGDBCore::IDebugSession& Session,
     VSGDBCore::U32 CpuId,
     const std::wstring& Expression,
     const VSGDBCore::ISymbolManager* SymbolManager)
@@ -179,7 +179,7 @@ EvaluateSimpleExpression(
     if (OperatorPosition == std::wstring::npos)
     {
         return EvaluateAtom(
-            Target,
+            Session,
             CpuId,
             Expression,
             SymbolManager);
@@ -200,7 +200,7 @@ EvaluateSimpleExpression(
     }
 
     auto Left = EvaluateAtom(
-        Target,
+        Session,
         CpuId,
         LeftText,
         SymbolManager);
@@ -211,7 +211,7 @@ EvaluateSimpleExpression(
     }
 
     auto Right = EvaluateAtom(
-        Target,
+        Session,
         CpuId,
         RightText,
         SymbolManager);

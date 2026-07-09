@@ -2,7 +2,7 @@
 
 #include "Types.h"
 #include "Result.h"
-#include "IDebugTarget.h"
+#include "IDebugSession.h"
 
 #include <string>
 #include <vector>
@@ -101,7 +101,7 @@ namespace VSGDBCore
         U64 EntryValue);
 
     Expected<X64AddressTranslationResult> TranslateX64VirtualAddress(
-        IDebugTarget& Target,
+        IDebugSession& Session,
         const X64PagingContext& Context,
         U64 VirtualAddress);
 

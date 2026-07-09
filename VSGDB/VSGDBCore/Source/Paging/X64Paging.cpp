@@ -23,10 +23,10 @@ namespace VSGDBCore
 
     static Expected<U64>
         ReadPhysicalU64(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U64 PhysicalAddress)
     {
-        auto Bytes = Target.ReadPhysicalMemory(
+        auto Bytes = Session.ReadPhysicalMemory(
             PhysicalAddress,
             sizeof(U64));
 
@@ -217,7 +217,7 @@ namespace VSGDBCore
 
     Expected<X64AddressTranslationResult>
         TranslateX64VirtualAddress(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             const X64PagingContext& Context,
             U64 VirtualAddress)
     {
@@ -258,7 +258,7 @@ namespace VSGDBCore
         const U64 Pml4eAddress =
             Pml4Base + static_cast<U64>(Parts.Pml4Index) * sizeof(U64);
 
-        auto Pml4eValue = ReadPhysicalU64(Target, Pml4eAddress);
+        auto Pml4eValue = ReadPhysicalU64(Session, Pml4eAddress);
         if (!Pml4eValue.HasValue())
         {
             return Expected<X64AddressTranslationResult>::Failure(
@@ -288,7 +288,7 @@ namespace VSGDBCore
             Pml4e.NextTablePhysicalBase +
             static_cast<U64>(Parts.PdptIndex) * sizeof(U64);
 
-        auto PdpteValue = ReadPhysicalU64(Target, PdpteAddress);
+        auto PdpteValue = ReadPhysicalU64(Session, PdpteAddress);
         if (!PdpteValue.HasValue())
         {
             return Expected<X64AddressTranslationResult>::Failure(
@@ -336,7 +336,7 @@ namespace VSGDBCore
             Pdpte.NextTablePhysicalBase +
             static_cast<U64>(Parts.PdIndex) * sizeof(U64);
 
-        auto PdeValue = ReadPhysicalU64(Target, PdeAddress);
+        auto PdeValue = ReadPhysicalU64(Session, PdeAddress);
         if (!PdeValue.HasValue())
         {
             return Expected<X64AddressTranslationResult>::Failure(
@@ -384,7 +384,7 @@ namespace VSGDBCore
             Pde.NextTablePhysicalBase +
             static_cast<U64>(Parts.PtIndex) * sizeof(U64);
 
-        auto PteValue = ReadPhysicalU64(Target, PteAddress);
+        auto PteValue = ReadPhysicalU64(Session, PteAddress);
         if (!PteValue.HasValue())
         {
             return Expected<X64AddressTranslationResult>::Failure(

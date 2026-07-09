@@ -5,7 +5,7 @@
 #include <VSGDBCore/StackTypes.h>
 #include <VSGDBCore/X64UnwindTypes.h>
 #include <VSGDBCore/IStackWalker.h>
-#include <VSGDBCore/IDebugTarget.h>
+#include <VSGDBCore/IDebugSession.h>
 #include <VSGDBCore/IModuleManager.h>
 
 #include "X64PeUnwindData.h"
@@ -20,26 +20,26 @@ namespace VSGDBCore
 
         Expected<X64UnwindResult>
             UnwindLeafFrame(
-                IDebugTarget& Target,
+                IDebugSession& Session,
                 U32 CpuId,
                 const RegisterContext& Context) const;
 
         Expected<X64UnwindResult>
             UnwindFrame(
-                IDebugTarget& Target,
+                IDebugSession& Session,
                 U32 CpuId,
                 const RegisterContext& Context);
 
         Expected<X64UnwindResult>
             ApplyUnwindInfo(
-                IDebugTarget& Target,
+                IDebugSession& Session,
                 U32 CpuId,
                 const RegisterContext& Context,
                 const X64UnwindInfo& UnwindInfo) const;
 
         Expected<std::vector<StackFrame>>
             WalkStack(
-                IDebugTarget& Target,
+                IDebugSession& Session,
                 U32 CpuId,
                 const StackWalkOptions& Options) override;
 

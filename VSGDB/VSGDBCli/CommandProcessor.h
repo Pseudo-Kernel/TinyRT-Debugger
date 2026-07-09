@@ -1,6 +1,6 @@
 #pragma once
 
-#include <VSGDBCore/GdbRemoteTarget.h>
+#include <VSGDBCore/IDebugSession.h>
 #include <VSGDBCore/IDisassembler.h>
 #include <VSGDBCore/IModuleManager.h>
 #include <VSGDBCore/ISymbolManager.h>
@@ -29,7 +29,7 @@ class CommandProcessor final
 {
 public:
     explicit CommandProcessor(
-        VSGDBCore::GdbRemoteTarget& Target,
+        std::unique_ptr<VSGDBCore::IDebugSession> Session,
         std::unique_ptr<VSGDBCore::IDisassembler> Disassembler,
         std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager,
         std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager,
@@ -163,7 +163,7 @@ private:
         bool Verbose);
 
 private:
-    VSGDBCore::GdbRemoteTarget& Target;
+    std::unique_ptr<VSGDBCore::IDebugSession> Session;
     VSGDBCore::U32 CurrentCpuId = 0;
     bool QuitRequested = false;
 

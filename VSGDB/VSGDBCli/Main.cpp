@@ -108,13 +108,13 @@ wmain(
     std::wprintf(L"Connecting to GDB remote target at %s:%u...\n", 
         Options.Host.c_str(), Options.Port);
 
-    VSGDBCore::GdbRemoteTarget Target;
+    auto Session = VSGDBCore::CreateDefaultDebugSession();
 
-    VSGDBCore::DebugTargetConfig Config{};
-    Config.Host = Options.Host;
-    Config.Port = Options.Port;
+    VSGDBCore::DebugSessionConnectOptions ConnectOptions{};
+    ConnectOptions.Host = Options.Host;
+    ConnectOptions.Port = Options.Port;
 
-    auto Error = Target.Connect(Config);
+    auto Error = Session->Connect(ConnectOptions);
     if (!Error.IsSuccess())
     {
         std::wprintf(
@@ -128,7 +128,7 @@ wmain(
 
     std::printf("Connected.\n");
 
-    auto Event = Target.WaitForEvent(0);
+    auto Event = Session->WaitForEvent(0);
     if (Event.HasValue())
     {
         std::wprintf(
@@ -142,7 +142,7 @@ wmain(
     auto StackWalker = VSGDBCore::CreateX64PeUnwindStackWalker(ModuleManager.get());
 
     CommandProcessor Processor(
-        Target,
+        std::move(Session),
         std::move(Disassembler),
         std::move(ModuleManager),
         std::move(SymbolManager),

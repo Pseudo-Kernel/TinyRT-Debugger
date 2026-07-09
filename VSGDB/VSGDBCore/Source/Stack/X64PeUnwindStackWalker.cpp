@@ -59,11 +59,11 @@ namespace VSGDBCore
 
     static Expected<U64>
         ReadU64FromTarget(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             U64 Address)
     {
-        auto Bytes = Target.ReadVirtualMemory(
+        auto Bytes = Session.ReadVirtualMemory(
             CpuId,
             Address,
             sizeof(U64));
@@ -124,12 +124,12 @@ namespace VSGDBCore
 
     Expected<X64UnwindResult>
         X64PeUnwindStackWalker::UnwindLeafFrame(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             const RegisterContext& Context) const
     {
         auto ReturnAddress = ReadU64FromTarget(
-            Target,
+            Session,
             CpuId,
             Context.Rsp);
 
@@ -153,14 +153,14 @@ namespace VSGDBCore
 
     Expected<X64UnwindResult>
         X64PeUnwindStackWalker::UnwindFrame(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             const RegisterContext& Context)
     {
         if (ModuleManager == nullptr)
         {
             return UnwindLeafFrame(
-                Target,
+                Session,
                 CpuId,
                 Context);
         }
@@ -171,7 +171,7 @@ namespace VSGDBCore
         if (!Module.HasValue())
         {
             return UnwindLeafFrame(
-                Target,
+                Session,
                 CpuId,
                 Context);
         }
@@ -187,7 +187,7 @@ namespace VSGDBCore
             // No .pdata entry means leaf function in x64 unwinding rules.
             //
             return UnwindLeafFrame(
-                Target,
+                Session,
                 CpuId,
                 Context);
         }
@@ -213,7 +213,7 @@ namespace VSGDBCore
         }
 
         return ApplyUnwindInfo(
-            Target,
+            Session,
             CpuId,
             Context,
             UnwindInfo.Value);
@@ -221,7 +221,7 @@ namespace VSGDBCore
 
     Expected<X64UnwindResult>
         X64PeUnwindStackWalker::ApplyUnwindInfo(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             const RegisterContext& Context,
             const X64UnwindInfo& UnwindInfo) const
@@ -259,7 +259,7 @@ namespace VSGDBCore
             case X64UnwindOp::PushNonVol:
             {
                 auto SavedValue = ReadU64FromTarget(
-                    Target,
+                    Session,
                     CpuId,
                     StackPointer);
 
@@ -355,7 +355,7 @@ namespace VSGDBCore
         }
 
         auto ReturnAddress = ReadU64FromTarget(
-            Target,
+            Session,
             CpuId,
             StackPointer);
 
@@ -380,11 +380,11 @@ namespace VSGDBCore
 
     Expected<std::vector<StackFrame>>
         X64PeUnwindStackWalker::WalkStack(
-            IDebugTarget& Target,
+            IDebugSession& Session,
             U32 CpuId,
             const StackWalkOptions& Options)
     {
-        auto Registers = Target.GetRegisters(CpuId);
+        auto Registers = Session.GetRegisters(CpuId);
 
         if (!Registers.HasValue())
         {
@@ -416,7 +416,7 @@ namespace VSGDBCore
             // function entry exists.
             //
             auto Unwind = UnwindFrame(
-                Target,
+                Session,
                 CpuId,
                 Context);
 

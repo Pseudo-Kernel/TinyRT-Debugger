@@ -1,6 +1,6 @@
 #pragma once
 
-#include <VSGDBCore/GdbRemoteTarget.h>
+#include <VSGDBCore/IDebugSession.h>
 #include <VSGDBCore/ISymbolManager.h>
 
 #include <string>
@@ -10,7 +10,7 @@ bool ParseU64(
     VSGDBCore::U64& OutValue);
 
 VSGDBCore::Expected<VSGDBCore::U64> EvaluateSimpleExpression(
-    VSGDBCore::GdbRemoteTarget& Target,
+    VSGDBCore::IDebugSession& Session,
     VSGDBCore::U32 CpuId,
     const std::wstring& Expression,
     const VSGDBCore::ISymbolManager* SymbolManager);
