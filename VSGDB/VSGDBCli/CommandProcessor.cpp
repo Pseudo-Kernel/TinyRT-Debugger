@@ -12,6 +12,8 @@
 
 #include <VSGDBCore/SymbolTypes.h>
 #include <VSGDBCore/X64Paging.h>
+#include <VSGDBCore/BreakpointTypes.h>
+#include <VSGDBCore/Result.h>
 #include <cstdio>
 #include <cwctype>
 #include <sstream>
@@ -935,17 +937,24 @@ CommandProcessor::ExecuteStep(
         return false;
     }
 
-    auto Error = Session->StepInto(CurrentCpuId);
+    VSGDBCore::DebugError Error = Session->StepInto(CurrentCpuId);
     if (!Error.IsSuccess())
     {
-        PrintDebugError(L"StepInto failed", Error);
+        PrintDebugError(L"Failed to step", Error);
         return false;
     }
 
-    auto Event = Session->GetLastEvent();
-    if (Event.HasValue())
+    auto SessionState = Session->GetState();
+    if (SessionState == VSGDBCore::DebugSessionState::Running ||
+        SessionState == VSGDBCore::DebugSessionState::StopPending)
     {
-        PrintStopEvent(Event.Value);
+        auto Event = Session->WaitForEvent(INFINITE);
+        if (!Event.HasValue())
+        {
+            PrintDebugError(L"Failed to wait for debug event", Event.Error);
+            return false;
+        }
+
         TryUpdateCurrentCpuFromStopEvent(Event.Value);
         ReportStopReason(Event.Value);
     }
@@ -963,12 +972,30 @@ CommandProcessor::ExecuteGo(
         return false;
     }
 
-    if (!StepOverCurrentSoftwareBreakpointIfNeeded())
+    VSGDBCore::DebugError Error = Session->Continue(CurrentCpuId);
+    if (!Error.IsSuccess())
     {
+        PrintDebugError(L"Failed to continue", Error);
         return false;
     }
 
-    return ContinueAllAndReportStop();
+    auto SessionState = Session->GetState();
+    if (SessionState == VSGDBCore::DebugSessionState::Running ||
+        SessionState == VSGDBCore::DebugSessionState::StopPending)
+    {
+        auto Event = Session->WaitForEvent(INFINITE);
+        if (!Event.HasValue())
+        {
+            PrintDebugError(L"Failed to wait for debug event", Event.Error);
+            return false;
+        }
+
+        TryUpdateCurrentCpuFromStopEvent(Event.Value);
+        ReportStopReason(Event.Value);
+    }
+
+    return true;
+//    return ContinueAllAndReportStop();
 }
 
 bool
@@ -996,45 +1023,25 @@ CommandProcessor::ExecuteBreakpointSet(
         return false;
     }
 
-    for (const auto& Breakpoint : Breakpoints)
-    {
-        if (Breakpoint.Enabled &&
-            Breakpoint.Kind == VSGDBCore::BreakpointKind::Software &&
-            Breakpoint.Address == Address.Value)
-        {
-            std::wprintf(
-                L"Breakpoint already exists at 0x%016llx. Id=%u\n",
-                Address.Value,
-                Breakpoint.Id);
-
-            return false;
-        }
-    }
-
-    auto SetResult = Session->SetBreakpoint(
+    auto Breakpoint = Session->SetBreakpoint(
         VSGDBCore::BreakpointKind::Software,
         Address.Value,
         1);
 
-    if (!SetResult.HasValue())
+    if (!Breakpoint.HasValue())
     {
-        PrintDebugError(L"SetBreakpoint failed", SetResult.Error);
+        PrintDebugError(
+            L"Failed to set breakpoint",
+            Breakpoint.Error);
+
         return false;
     }
 
-    CliBreakpoint Breakpoint{};
-    Breakpoint.Id = SetResult.Value;
-    Breakpoint.Kind = VSGDBCore::BreakpointKind::Software;
-    Breakpoint.Address = Address.Value;
-    Breakpoint.Size = 1;
-    Breakpoint.Enabled = true;
-
-    Breakpoints.push_back(Breakpoint);
-
     std::wprintf(
         L"Breakpoint %u set at %s\n",
-        Breakpoint.Id,
-        Formatter->FormatAddressInline(Breakpoint.Address).c_str());
+        Breakpoint.Value.Id,
+        Formatter->FormatAddressInline(
+            Breakpoint.Value.Address).c_str());
 
     return true;
 }
@@ -1054,7 +1061,18 @@ CommandProcessor::ExecuteBreakpointList(
     std::wprintf(
         L"Id  Address             Size  Kind       State     Symbol\n");
 
-    for (const auto& Breakpoint : Breakpoints)
+    auto Breakpoints = Session->EnumerateBreakpoints();
+
+    if (!Breakpoints.HasValue())
+    {
+        PrintDebugError(
+            L"Failed to enumerate breakpoints",
+            Breakpoints.Error);
+
+        return false;
+    }
+
+    for (const auto& Breakpoint : Breakpoints.Value)
     {
         if (!Breakpoint.Enabled)
         {
@@ -1121,44 +1139,23 @@ CommandProcessor::ExecuteBreakpointClear(
     const auto BreakpointId =
         static_cast<VSGDBCore::BreakpointId>(Id32);
 
-    for (auto& Breakpoint : Breakpoints)
+    VSGDBCore::DebugError Error =
+        Session->DeleteBreakpoint(BreakpointId);
+
+    if (!Error.IsSuccess())
     {
-        if (Breakpoint.Id != BreakpointId)
-        {
-            continue;
-        }
+        PrintDebugError(
+            L"Failed to clear breakpoint",
+            Error);
 
-        if (!Breakpoint.Enabled)
-        {
-            std::wprintf(
-                L"Breakpoint %u is already disabled.\n",
-                BreakpointId);
-
-            return false;
-        }
-
-        auto Error = Session->DeleteBreakpoint(BreakpointId);
-
-        if (!Error.IsSuccess())
-        {
-            PrintDebugError(L"DeleteBreakpoint failed", Error);
-            return false;
-        }
-
-        Breakpoint.Enabled = false;
-
-        std::wprintf(
-            L"Breakpoint %u cleared.\n",
-            BreakpointId);
-
-        return true;
+        return false;
     }
 
     std::wprintf(
-        L"Breakpoint %u was not found.\n",
+        L"Breakpoint %u cleared.\n",
         BreakpointId);
 
-    return false;
+    return true;
 }
 
 bool
@@ -1235,19 +1232,52 @@ CommandProcessor::ReportStopReason(
         return;
     }
 
-    const VSGDBCore::U64 Rip = Registers.Value.Rip;
-
-    const CliBreakpoint* Breakpoint =
-        FindEnabledSoftwareBreakpointByAddress(Rip);
-
-    if (Breakpoint != nullptr)
+    if (Event.StopReason == VSGDBCore::DebugStopReason::Breakpoint)
     {
-        std::wprintf(
-            L"Hit breakpoint %u at %s\n",
-            Breakpoint->Id,
-            Formatter->FormatAddressInline(Breakpoint->Address).c_str());
+        // 
+        // Find the matching breakpoint.
+        // 
 
-        return;
+        const VSGDBCore::U64 Rip = Registers.Value.Rip;
+        bool BreakpointFound = false;
+        VSGDBCore::U32 BreakpointId = 0;
+
+        auto Breakpoints = Session->EnumerateBreakpoints();
+        if (!Breakpoints.HasValue())
+        {
+            std::wprintf(
+                L"Warning: Cannot enumerate breakpoints\n");
+        }
+        else
+        {
+            auto Iterator = std::find_if(
+                Breakpoints.Value.begin(),
+                Breakpoints.Value.end(),
+                [Rip](const auto& bp)
+                {
+                    return bp.Address == Rip;
+                });
+
+            if (Iterator != Breakpoints.Value.end())
+            {
+                BreakpointId = Iterator->Id;
+                BreakpointFound = true;
+            }
+        }
+
+        if (BreakpointFound)
+        {
+            std::wprintf(
+                L"Hit breakpoint %u at %s\n",
+                BreakpointId,
+                Formatter->FormatAddressInline(Rip).c_str());
+        }
+        else
+        {
+            std::wprintf(
+                L"Hit breakpoint unknown at %s\n",
+                Formatter->FormatAddressInline(Rip).c_str());
+        }
     }
 
     //
@@ -1258,53 +1288,18 @@ CommandProcessor::ReportStopReason(
     //
 }
 
-const CliBreakpoint*
-CommandProcessor::FindEnabledSoftwareBreakpointByAddress(
-    VSGDBCore::U64 Address) const
-{
-    for (const auto& Breakpoint : Breakpoints)
-    {
-        if (!Breakpoint.Enabled)
-        {
-            continue;
-        }
-
-        if (Breakpoint.Kind != VSGDBCore::BreakpointKind::Software)
-        {
-            continue;
-        }
-
-        if (Breakpoint.Address == Address)
-        {
-            return &Breakpoint;
-        }
-    }
-
-    return nullptr;
-}
-
 void
 CommandProcessor::ClearAllKnownBreakpoints()
 {
-    for (auto& Breakpoint : Breakpoints)
+    VSGDBCore::DebugError Error =
+        Session->DeleteAllBreakpoints();
+
+    if (!Error.IsSuccess())
     {
-        if (!Breakpoint.Enabled)
-        {
-            continue;
-        }
-
-        auto Error = Session->DeleteBreakpoint(Breakpoint.Id);
-        if (!Error.IsSuccess())
-        {
-            std::wprintf(
-                L"Warning: failed to clear breakpoint %u: %s\n",
-                Breakpoint.Id,
-                Error.Message.c_str());
-
-            continue;
-        }
-
-        Breakpoint.Enabled = false;
+        PrintDebugError(
+            L"Failed to clear breakpoints",
+            Error);
+        //return false;
     }
 }
 
@@ -1340,7 +1335,10 @@ CommandProcessor::ExecuteBreakpointClearAddress(
 
     if (!Error.IsSuccess())
     {
-        PrintDebugError(L"DeleteBreakpointByAddress failed", Error);
+        PrintDebugError(
+            L"Failed to clear breakpoint by address",
+            Error);
+
         return false;
     }
 
@@ -1382,232 +1380,6 @@ CommandProcessor::ContinueAllAndReportStop()
 
         ReportStopReason(Event.Value);
     }
-
-    return true;
-}
-
-CliBreakpoint*
-CommandProcessor::FindEnabledSoftwareBreakpointByAddressMutable(
-    VSGDBCore::U64 Address)
-{
-    for (auto& Breakpoint : Breakpoints)
-    {
-        if (!Breakpoint.Enabled)
-        {
-            continue;
-        }
-
-        if (Breakpoint.Kind != VSGDBCore::BreakpointKind::Software)
-        {
-            continue;
-        }
-
-        if (Breakpoint.Address != Address)
-        {
-            continue;
-        }
-
-        if (Breakpoint.Size != 1)
-        {
-            continue;
-        }
-
-        return &Breakpoint;
-    }
-
-    return nullptr;
-}
-
-bool
-CommandProcessor::ExecuteGoFromBreakpoint(
-    const std::vector<std::wstring>& Arguments)
-{
-    if (Arguments.size() != 1)
-    {
-        std::wprintf(L"Usage: gb\n");
-        return false;
-    }
-
-    auto Registers = Session->GetRegisters(CurrentCpuId);
-    if (!Registers.HasValue())
-    {
-        PrintDebugError(L"GetRegisters failed", Registers.Error);
-        return false;
-    }
-
-    const VSGDBCore::U64 Rip = Registers.Value.Rip;
-
-    CliBreakpoint* Breakpoint =
-        FindEnabledSoftwareBreakpointByAddressMutable(Rip);
-
-    if (Breakpoint == nullptr)
-    {
-        return ContinueAllAndReportStop();
-    }
-
-    std::wprintf(
-        L"Stepping over breakpoint %u at 0x%016llx\n",
-        Breakpoint->Id,
-        Breakpoint->Address);
-
-    auto RemoveError = Session->RemoveBreakpointFromTarget(
-        Breakpoint->Id);
-
-    if (!RemoveError.IsSuccess())
-    {
-        PrintDebugError(L"RemoveBreakpointFromTarget failed", RemoveError);
-
-        return false;
-    }
-
-    Breakpoint->Inserted = false;
-
-    auto StepError = Session->StepInto(CurrentCpuId);
-    if (!StepError.IsSuccess())
-    {
-        PrintDebugError(
-            L"StepInto failed while stepping over breakpoint",
-            StepError);
-
-        //
-        // Best-effort restore.
-        //
-        auto RestoreError = Session->InsertBreakpointIntoTarget(
-            Breakpoint->Id);
-
-        if (!RestoreError.IsSuccess())
-        {
-            std::wprintf(
-                L"WARNING: failed to restore breakpoint %u: %s\n",
-                Breakpoint->Id,
-                RestoreError.Message.c_str());
-        }
-        else
-        {
-            Breakpoint->Inserted = true;
-        }
-
-        return false;
-    }
-
-    auto StepEvent = Session->GetLastEvent();
-    if (StepEvent.HasValue())
-    {
-        PrintStopEvent(StepEvent.Value);
-        TryUpdateCurrentCpuFromStopEvent(StepEvent.Value);
-    }
-
-    auto RestoreError = Session->InsertBreakpointIntoTarget(
-        Breakpoint->Id);
-
-    if (!RestoreError.IsSuccess())
-    {
-        PrintDebugError(
-            L"InsertBreakpointIntoTarget failed while restoring breakpoint",
-            RestoreError);
-
-        Breakpoint->Inserted = false;
-        return false;
-    }
-
-    Breakpoint->Inserted = true;
-
-    std::wprintf(
-        L"Breakpoint %u restored at 0x%016llx\n",
-        Breakpoint->Id,
-        Breakpoint->Address);
-
-    return ContinueAllAndReportStop();
-}
-
-bool
-CommandProcessor::StepOverCurrentSoftwareBreakpointIfNeeded()
-{
-    auto Registers = Session->GetRegisters(CurrentCpuId);
-    if (!Registers.HasValue())
-    {
-        PrintDebugError(L"GetRegisters failed", Registers.Error);
-        return false;
-    }
-
-    const VSGDBCore::U64 Rip = Registers.Value.Rip;
-
-    CliBreakpoint* Breakpoint =
-        FindEnabledSoftwareBreakpointByAddressMutable(Rip);
-
-    if (Breakpoint == nullptr)
-    {
-        return true;
-    }
-
-    const VSGDBCore::BreakpointId BreakpointId = Breakpoint->Id;
-    const VSGDBCore::U64 BreakpointAddress = Breakpoint->Address;
-
-    //
-    // Final UX: keep this short. It is useful enough to know that the debugger
-    // handled the breakpoint resume path.
-    //
-    std::wprintf(
-        L"Stepping over breakpoint %u at 0x%016llx\n",
-        BreakpointId,
-        BreakpointAddress);
-
-    auto RemoveError = Session->RemoveBreakpointFromTarget(BreakpointId);
-    if (!RemoveError.IsSuccess())
-    {
-        PrintDebugError(L"RemoveBreakpointFromTarget failed", RemoveError);
-        return false;
-    }
-
-    Breakpoint->Inserted = false;
-
-    auto StepError = Session->StepInto(CurrentCpuId);
-    if (!StepError.IsSuccess())
-    {
-        PrintDebugError(
-            L"StepInto failed while stepping over breakpoint",
-            StepError);
-
-        auto RestoreError = Session->InsertBreakpointIntoTarget(BreakpointId);
-        if (!RestoreError.IsSuccess())
-        {
-            std::wprintf(
-                L"WARNING: failed to restore breakpoint %u: %s\n",
-                BreakpointId,
-                RestoreError.Message.c_str());
-        }
-        else
-        {
-            Breakpoint->Inserted = true;
-        }
-
-        return false;
-    }
-
-    //
-    // Do not print/report the internal single-step stop here.
-    // It is an implementation detail of continuing from a software breakpoint.
-    // However, update CurrentCpuId just in case QEMU reports the step stop
-    // using a normalized/alternate thread ID.
-    //
-    auto StepEvent = Session->GetLastEvent();
-    if (StepEvent.HasValue())
-    {
-        TryUpdateCurrentCpuFromStopEvent(StepEvent.Value);
-    }
-
-    auto RestoreError = Session->InsertBreakpointIntoTarget(BreakpointId);
-    if (!RestoreError.IsSuccess())
-    {
-        PrintDebugError(
-            L"InsertBreakpointIntoTarget failed while restoring breakpoint",
-            RestoreError);
-
-        Breakpoint->Inserted = false;
-        return false;
-    }
-
-    Breakpoint->Inserted = true;
 
     return true;
 }

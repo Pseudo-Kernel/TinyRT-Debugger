@@ -50,7 +50,7 @@ namespace VSGDBCore
 
         Expected<DebugEvent> GetLastEvent() const override;
 
-        Expected<BreakpointId> SetBreakpoint(
+        Expected<BreakpointInfo> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) override;
@@ -63,13 +63,13 @@ namespace VSGDBCore
             U64 Address,
             U32 Size) override;
 
-        DebugError RemoveBreakpointFromTarget(
-            BreakpointId Id) override;
-
-        DebugError InsertBreakpointIntoTarget(
-            BreakpointId Id) override;
+        Expected<std::vector<BreakpointInfo>>
+            EnumerateBreakpoints() const override;
 
         DebugError DeleteAllBreakpoints() override;
+
+    private:
+        Expected<bool> StepOverCurrentSoftwareBreakpointIfNeeded(U32 CpuId);
 
     private:
         DebugError RequireConnected() const;

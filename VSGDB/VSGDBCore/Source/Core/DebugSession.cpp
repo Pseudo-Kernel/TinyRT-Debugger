@@ -109,6 +109,16 @@ namespace VSGDBCore
             State = DebugSessionState::Running;
         }
 
+        auto SteppedOver =
+            StepOverCurrentSoftwareBreakpointIfNeeded(CpuId);
+
+        if (!SteppedOver.HasValue())
+        {
+            std::lock_guard<std::mutex> Guard(Lock);
+            State = DebugSessionState::Stopped;
+            return SteppedOver.Error;
+        }
+
         DebugError Error = Target->Continue(CpuId);
         if (!Error.IsSuccess())
         {
@@ -160,6 +170,23 @@ namespace VSGDBCore
             }
 
             State = DebugSessionState::Running;
+        }
+
+        auto SteppedOver =
+            StepOverCurrentSoftwareBreakpointIfNeeded(CpuId);
+
+        if (!SteppedOver.HasValue())
+        {
+            std::lock_guard<std::mutex> Guard(Lock);
+            State = DebugSessionState::Stopped;
+            return SteppedOver.Error;
+        }
+
+        if (SteppedOver.Value)
+        {
+            std::lock_guard<std::mutex> Guard(Lock);
+            State = DebugSessionState::Stopped;
+            return DebugError::Success();
         }
 
         DebugError Error = Target->StepInto(CpuId);
@@ -325,7 +352,7 @@ namespace VSGDBCore
                 L"Not implemented"));
     }
 
-    Expected<BreakpointId>
+    Expected<BreakpointInfo>
         DebugSession::SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
@@ -337,38 +364,135 @@ namespace VSGDBCore
             DebugError StateError = RequireStoppedLocked();
             if (!StateError.IsSuccess())
             {
-                return Expected<BreakpointId>::Failure(StateError);
+                return Expected<BreakpointInfo>::Failure(StateError);
             }
         }
 
-        return Target->SetBreakpoint(
+        auto Id = Target->SetBreakpoint(
             Kind,
             Address,
             Size);
+
+        if (!Id.HasValue())
+        {
+            return Expected<BreakpointInfo>::Failure(Id.Error);
+        }
+
+        auto Breakpoints = Target->EnumerateBreakpoints();
+        if (!Breakpoints.HasValue())
+        {
+            return Expected<BreakpointInfo>::Failure(Breakpoints.Error);
+        }
+
+        for (const BreakpointInfo& Breakpoint : Breakpoints.Value)
+        {
+            if (Breakpoint.Id == Id.Value.Id)
+            {
+                return Expected<BreakpointInfo>::Success(Breakpoint);
+            }
+        }
+
+        return Expected<BreakpointInfo>::Failure(
+            DebugError::Failure(
+                ErrorCode::InternalError,
+                L"Breakpoint was inserted but could not be enumerated."));
     }
 
     DebugError
         DebugSession::DeleteBreakpoint(
             BreakpointId Id)
     {
-        return DebugError::Failure(
-            ErrorCode::InternalError, 
-            L"Not implemented");
+        {
+            std::lock_guard<std::mutex> Guard(Lock);
+
+            DebugError StateError = RequireStoppedLocked();
+            if (!StateError.IsSuccess())
+            {
+                return StateError;
+            }
+        }
+
+        return Target->DeleteBreakpoint(Id);
+    }
+
+    DebugError
+        DebugSession::DeleteAllBreakpoints()
+    {
+        {
+            std::lock_guard<std::mutex> Guard(Lock);
+
+            DebugError StateError = RequireStoppedLocked();
+            if (!StateError.IsSuccess())
+            {
+                return StateError;
+            }
+        }
+
+        return Target->DeleteAllBreakpoints();
     }
 
     DebugError
         DebugSession::DeleteBreakpointByAddress(
-            BreakpointKind Kind, 
-            U64 Address, 
+            BreakpointKind Kind,
+            U64 Address,
             U32 Size)
     {
+        {
+            std::lock_guard<std::mutex> Guard(Lock);
+
+            DebugError StateError = RequireStoppedLocked();
+            if (!StateError.IsSuccess())
+            {
+                return StateError;
+            }
+        }
+
+        auto Breakpoints = Target->EnumerateBreakpoints();
+        if (!Breakpoints.HasValue())
+        {
+            return Breakpoints.Error;
+        }
+
+        for (const BreakpointInfo& Breakpoint : Breakpoints.Value)
+        {
+            if (!Breakpoint.Enabled)
+            {
+                continue;
+            }
+
+            if (Breakpoint.Kind == Kind &&
+                Breakpoint.Address == Address &&
+                Breakpoint.Size == Size)
+            {
+                return Target->DeleteBreakpoint(Breakpoint.Id);
+            }
+        }
+
         return DebugError::Failure(
-            ErrorCode::InternalError,
-            L"Not implemented");
+            ErrorCode::BreakpointFailure,
+            L"Breakpoint was not found at the specified address.");
     }
 
+    Expected<std::vector<BreakpointInfo>>
+        DebugSession::EnumerateBreakpoints() const
+    {
+        {
+            std::lock_guard<std::mutex> Guard(Lock);
+
+            DebugError StateError = RequireStoppedLocked();
+            if (!StateError.IsSuccess())
+            {
+                return Expected<std::vector<BreakpointInfo>>::Failure(
+                    StateError);
+            }
+        }
+
+        return Target->EnumerateBreakpoints();
+    }
+
+#if 0
     DebugError
-        DebugSession::RemoveBreakpointFromTarget(
+        DebugSession::DisableBreakpointInTarget(
             BreakpointId Id)
     {
         //{
@@ -381,7 +505,7 @@ namespace VSGDBCore
         //    }
         //}
         //
-        //return Target->RemoveBreakpointFromTarget(Id);
+        //return Target->DisableBreakpointInTarget(Id);
 
         return DebugError::Failure(
             ErrorCode::InternalError,
@@ -389,20 +513,95 @@ namespace VSGDBCore
     }
 
     DebugError
-        DebugSession::InsertBreakpointIntoTarget(
+        DebugSession::EnableBreakpointInTarget(
             BreakpointId Id)
     {
         return DebugError::Failure(
             ErrorCode::InternalError,
             L"Not implemented");
     }
+#endif
 
-    DebugError
-        DebugSession::DeleteAllBreakpoints()
+
+
+    Expected<bool>
+        DebugSession::StepOverCurrentSoftwareBreakpointIfNeeded(
+            U32 CpuId)
     {
-        return DebugError::Failure(
-            ErrorCode::InternalError,
-            L"Not implemented");
+        auto Registers = Target->GetRegisters(CpuId);
+        if (!Registers.HasValue())
+        {
+            return Expected<bool>::Failure(Registers.Error);
+        }
+
+        const U64 Rip = Registers.Value.Rip;
+
+        auto Breakpoints = Target->EnumerateBreakpoints();
+        if (!Breakpoints.HasValue())
+        {
+            return Expected<bool>::Failure(Breakpoints.Error);
+        }
+
+        std::vector<BreakpointId> DisabledBreakpointIds;
+
+        for (const BreakpointInfo& Breakpoint : Breakpoints.Value)
+        {
+            if (!Breakpoint.Enabled ||
+                Breakpoint.Kind != BreakpointKind::Software ||
+                Breakpoint.Address != Rip ||
+                Breakpoint.Size != 1)
+            {
+                continue;
+            }
+
+            DisabledBreakpointIds.push_back(Breakpoint.Id);
+        }
+
+        if (DisabledBreakpointIds.empty())
+        {
+            return Expected<bool>::Success(false);
+        }
+
+        for (BreakpointId Id : DisabledBreakpointIds)
+        {
+            DebugError Error =
+                Target->DisableBreakpointInTarget(Id);
+
+            if (!Error.IsSuccess())
+            {
+                return Expected<bool>::Failure(Error);
+            }
+        }
+
+        DebugError StepError =
+            Target->StepInto(CpuId);
+
+        DebugError FirstEnableError =
+            DebugError::Success();
+
+        for (BreakpointId Id : DisabledBreakpointIds)
+        {
+            DebugError Error =
+                Target->EnableBreakpointInTarget(Id);
+
+            if (!Error.IsSuccess() &&
+                FirstEnableError.IsSuccess())
+            {
+                FirstEnableError = Error;
+            }
+        }
+
+        if (!StepError.IsSuccess())
+        {
+            return Expected<bool>::Failure(StepError);
+        }
+
+        if (!FirstEnableError.IsSuccess())
+        {
+            return Expected<bool>::Failure(FirstEnableError);
+        }
+
+        return Expected<bool>::Success(true);
     }
 
 }

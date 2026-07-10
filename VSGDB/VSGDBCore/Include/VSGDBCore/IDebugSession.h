@@ -51,7 +51,7 @@ namespace VSGDBCore
 
         virtual Expected<DebugEvent> GetLastEvent() const = 0;
 
-        virtual Expected<BreakpointId> SetBreakpoint(
+        virtual Expected<BreakpointInfo> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) = 0;
@@ -64,11 +64,16 @@ namespace VSGDBCore
             U64 Address,
             U32 Size) = 0;
 
-        virtual DebugError RemoveBreakpointFromTarget(
+        virtual Expected<std::vector<BreakpointInfo>>
+            EnumerateBreakpoints() const = 0;
+
+#if 0
+        virtual DebugError DisableBreakpointInTarget(
             BreakpointId Id) = 0;
 
-        virtual DebugError InsertBreakpointIntoTarget(
+        virtual DebugError EnableBreakpointInTarget(
             BreakpointId Id) = 0;
+#endif
 
         virtual DebugError DeleteAllBreakpoints() = 0;
     };

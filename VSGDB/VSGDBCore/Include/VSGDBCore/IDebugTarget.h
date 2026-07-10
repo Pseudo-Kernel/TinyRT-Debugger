@@ -101,7 +101,13 @@ namespace VSGDBCore
             U64 Address,
             const ByteVector& Bytes) = 0;
 
-        virtual Expected<BreakpointId> SetBreakpoint(
+        virtual Expected<std::vector<DebugThreadInfo>> EnumerateThreads() = 0;
+
+        // 
+        // Breakpoints.
+        // 
+
+        virtual Expected<BreakpointInfo> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) = 0;
@@ -109,6 +115,21 @@ namespace VSGDBCore
         virtual DebugError DeleteBreakpoint(
             BreakpointId Id) = 0;
 
-        virtual Expected<std::vector<DebugThreadInfo>> EnumerateThreads() = 0;
+        virtual DebugError DeleteAllBreakpoints() = 0;
+
+        virtual Expected<std::vector<BreakpointInfo>>
+            EnumerateBreakpoints() const = 0;
+
+        virtual DebugError DeleteBreakpointByAddress(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size) = 0;
+
+        virtual DebugError DisableBreakpointInTarget(
+            BreakpointId Id) = 0;
+
+        virtual DebugError EnableBreakpointInTarget(
+            BreakpointId Id) = 0;
+
     };
 }

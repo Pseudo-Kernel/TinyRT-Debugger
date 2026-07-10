@@ -489,7 +489,7 @@ namespace VSGDBCore
             L"WritePhysicalMemory is not implemented yet.");
     }
 
-    Expected<BreakpointId>
+    Expected<BreakpointInfo>
         GdbRemoteTarget::SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
@@ -502,7 +502,7 @@ namespace VSGDBCore
 
         if (!Error.IsSuccess())
         {
-            return Expected<BreakpointId>::Failure(Error);
+            return Expected<BreakpointInfo>::Failure(Error);
         }
 
         const BreakpointId Id = NextBreakpointId++;
@@ -517,7 +517,7 @@ namespace VSGDBCore
 
         Breakpoints.emplace(Id, Info);
 
-        return Expected<BreakpointId>::Success(Id);
+        return Expected<BreakpointInfo>::Success(Info);
     }
 
     DebugError
@@ -558,6 +558,29 @@ namespace VSGDBCore
 
         Breakpoint.Enabled = false;
         return DebugError::Success();
+    }
+
+    Expected<std::vector<BreakpointInfo>>
+        GdbRemoteTarget::EnumerateBreakpoints() const
+    {
+        std::vector<BreakpointInfo> Result;
+
+        Result.reserve(Breakpoints.size());
+
+        for (const auto& Pair : Breakpoints)
+        {
+            const BreakpointInfo& Breakpoint = Pair.second;
+
+            if (!Breakpoint.Enabled)
+            {
+                continue;
+            }
+
+            Result.push_back(Breakpoint);
+        }
+
+        return Expected<std::vector<BreakpointInfo>>::Success(
+            std::move(Result));
     }
 
     DebugError
@@ -685,7 +708,7 @@ namespace VSGDBCore
     }
 
     DebugError
-        GdbRemoteTarget::RemoveBreakpointFromTarget(
+        GdbRemoteTarget::DisableBreakpointInTarget(
             BreakpointId Id)
     {
         auto It = Breakpoints.find(Id);
@@ -725,7 +748,7 @@ namespace VSGDBCore
     }
 
     DebugError
-        GdbRemoteTarget::InsertBreakpointIntoTarget(
+        GdbRemoteTarget::EnableBreakpointInTarget(
             BreakpointId Id)
     {
         auto It = Breakpoints.find(Id);
@@ -778,19 +801,24 @@ namespace VSGDBCore
                 continue;
             }
 
-            DebugError Error = DeleteRemoteBreakpoint(
-                Breakpoint.Kind,
-                Breakpoint.Address,
-                Breakpoint.Size);
-
-            if (!Error.IsSuccess())
+            if (Breakpoint.Inserted)
             {
-                if (FirstError.IsSuccess())
+                DebugError Error = DeleteRemoteBreakpoint(
+                    Breakpoint.Kind,
+                    Breakpoint.Address,
+                    Breakpoint.Size);
+
+                if (!Error.IsSuccess())
                 {
-                    FirstError = Error;
+                    if (FirstError.IsSuccess())
+                    {
+                        FirstError = Error;
+                    }
+
+                    continue;
                 }
 
-                continue;
+                Breakpoint.Inserted = false;
             }
 
             Breakpoint.Enabled = false;

@@ -15,16 +15,6 @@
 #include <atomic>
 
 
-struct CliBreakpoint
-{
-    VSGDBCore::BreakpointId Id = 0;
-    VSGDBCore::BreakpointKind Kind = VSGDBCore::BreakpointKind::Software;
-    VSGDBCore::U64 Address = 0;
-    VSGDBCore::U32 Size = 1;
-    bool Enabled = false;
-    bool Inserted = false;
-};
-
 class CommandProcessor final
 {
 public:
@@ -104,18 +94,16 @@ private:
     bool ExecuteBreakpointClearAddress(
         const std::vector<std::wstring>& Arguments);
 
-    bool ExecuteGoFromBreakpoint(
-        const std::vector<std::wstring>& Arguments);
+//    bool ExecuteGoFromBreakpoint(
+//        const std::vector<std::wstring>& Arguments);
 
     bool ContinueAllAndReportStop();
 
-    const CliBreakpoint* FindEnabledSoftwareBreakpointByAddress(
-        VSGDBCore::U64 Address) const;
+//    const CliBreakpoint* FindEnabledSoftwareBreakpointByAddress(
+//        VSGDBCore::U64 Address) const;
 
-    CliBreakpoint* FindEnabledSoftwareBreakpointByAddressMutable(
-        VSGDBCore::U64 Address);
-
-    bool StepOverCurrentSoftwareBreakpointIfNeeded();
+//    CliBreakpoint* FindEnabledSoftwareBreakpointByAddressMutable(
+//        VSGDBCore::U64 Address);
 
     bool ExecuteDisassemble(
         const std::vector<std::wstring>& Arguments);
@@ -167,7 +155,7 @@ private:
     VSGDBCore::U32 CurrentCpuId = 0;
     bool QuitRequested = false;
 
-    std::vector<CliBreakpoint> Breakpoints;
+//    std::vector<CliBreakpoint> Breakpoints;
 
     std::atomic<bool> TargetRunning = false;
     std::atomic<bool> BreakRequested = false;

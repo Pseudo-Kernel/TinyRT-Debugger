@@ -59,7 +59,7 @@ namespace VSGDBCore
             U64 Address,
             const ByteVector& Bytes) override;
 
-        Expected<BreakpointId> SetBreakpoint(
+        Expected<BreakpointInfo> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) override;
@@ -67,6 +67,16 @@ namespace VSGDBCore
         DebugError DeleteBreakpoint(
             BreakpointId Id) override;
 
+        Expected<std::vector<BreakpointInfo>>
+            EnumerateBreakpoints() const override;
+
+        DebugError DisableBreakpointInTarget(
+            BreakpointId Id) override;
+
+        DebugError EnableBreakpointInTarget(
+            BreakpointId Id) override;
+
+    private:
         DebugError DeleteBreakpointByAddress(
             BreakpointKind Kind,
             U64 Address,
@@ -81,12 +91,6 @@ namespace VSGDBCore
             BreakpointKind Kind,
             U64 Address,
             U32 Size);
-
-        DebugError RemoveBreakpointFromTarget(
-            BreakpointId Id);
-
-        DebugError InsertBreakpointIntoTarget(
-            BreakpointId Id);
 
         DebugError DeleteAllBreakpoints();
 

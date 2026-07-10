@@ -2,6 +2,7 @@
 
 namespace VSGDBCore
 {
+#if 0
     class NullDebugTarget final : public IDebugTarget
     {
     public:
@@ -138,7 +139,16 @@ namespace VSGDBCore
                 L"Debug target is not available.");
         }
 
-        Expected<BreakpointId> SetBreakpoint(
+        Expected<std::vector<DebugThreadInfo>>
+            EnumerateThreads() override
+        {
+            return Expected<std::vector<DebugThreadInfo>>::Failure(
+                DebugError::Failure(
+                    ErrorCode::NotSupported,
+                    L"Debug target is not available."));
+        }
+
+        Expected<BreakpointInfo> SetBreakpoint(
             BreakpointKind Kind,
             U64 Address,
             U32 Size) override
@@ -147,7 +157,7 @@ namespace VSGDBCore
             (void)Address;
             (void)Size;
 
-            return Expected<BreakpointId>::Failure(
+            return Expected<BreakpointInfo>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));
@@ -163,19 +173,38 @@ namespace VSGDBCore
                 L"Debug target is not available.");
         }
 
-        Expected<std::vector<DebugThreadInfo>>
-            EnumerateThreads() override
+        DebugError DeleteAllBreakpoints() override
         {
-            return Expected<std::vector<DebugThreadInfo>>::Failure(
+            return DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"Debug target is not available.");
+        }
+
+        Expected<std::vector<BreakpointInfo>>
+            EnumerateBreakpoints() const override
+        {
+            return Expected<std::vector<BreakpointInfo>>::Failure(
                 DebugError::Failure(
                     ErrorCode::NotSupported,
                     L"Debug target is not available."));
         }
+
+        DebugError DeleteBreakpointByAddress(
+            BreakpointKind Kind,
+            U64 Address,
+            U32 Size) override
+        {
+            return DebugError::Failure(
+                ErrorCode::NotSupported,
+                L"Debug target is not available.");
+        }
+
     };
+#endif
 
     std::unique_ptr<IDebugTarget>
     CreateNullDebugTarget()
     {
-        return std::make_unique<NullDebugTarget>();
+        return nullptr; //return std::make_unique<NullDebugTarget>();
     }
 }
