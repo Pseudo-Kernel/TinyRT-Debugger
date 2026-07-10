@@ -67,14 +67,6 @@ namespace VSGDBCore
         virtual Expected<std::vector<BreakpointInfo>>
             EnumerateBreakpoints() const = 0;
 
-#if 0
-        virtual DebugError DisableBreakpointInTarget(
-            BreakpointId Id) = 0;
-
-        virtual DebugError EnableBreakpointInTarget(
-            BreakpointId Id) = 0;
-#endif
-
         virtual DebugError DeleteAllBreakpoints() = 0;
     };
 }

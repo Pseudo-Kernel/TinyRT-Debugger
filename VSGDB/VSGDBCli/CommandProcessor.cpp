@@ -31,6 +31,31 @@ static constexpr VSGDBCore::U32 MaxFunctionDisassemblyBytes = 0x1000;
 static constexpr size_t MaxSymbolSearchResults = 2048;
 
 
+class ScopedTargetRunning final
+{
+public:
+    ScopedTargetRunning(
+        std::atomic_bool& TargetRunning,
+        std::atomic_bool& BreakRequested)
+        : TargetRunning(TargetRunning),
+        BreakRequested(BreakRequested)
+    {
+        this->BreakRequested.store(false, std::memory_order_release);
+        this->TargetRunning.store(true, std::memory_order_release);
+    }
+
+    ~ScopedTargetRunning()
+    {
+        TargetRunning.store(false, std::memory_order_release);
+        BreakRequested.store(false, std::memory_order_release);
+    }
+
+private:
+    std::atomic_bool& TargetRunning;
+    std::atomic_bool& BreakRequested;
+};
+
+
 static std::wstring
 ToLower(
     std::wstring Text)
@@ -948,6 +973,10 @@ CommandProcessor::ExecuteStep(
     if (SessionState == VSGDBCore::DebugSessionState::Running ||
         SessionState == VSGDBCore::DebugSessionState::StopPending)
     {
+        ScopedTargetRunning RunningGuard(
+            TargetRunning,
+            BreakRequested);
+
         auto Event = Session->WaitForEvent(INFINITE);
         if (!Event.HasValue())
         {
@@ -971,6 +1000,10 @@ CommandProcessor::ExecuteGo(
         std::wprintf(L"Usage: g\n");
         return false;
     }
+
+    ScopedTargetRunning RunningGuard(
+        TargetRunning,
+        BreakRequested);
 
     VSGDBCore::DebugError Error = Session->Continue(CurrentCpuId);
     if (!Error.IsSuccess())
@@ -1232,13 +1265,15 @@ CommandProcessor::ReportStopReason(
         return;
     }
 
+    const VSGDBCore::U64 Rip = Registers.Value.Rip;
+    auto FormattedAddress = Formatter->FormatAddressInline(Rip);
+
     if (Event.StopReason == VSGDBCore::DebugStopReason::Breakpoint)
     {
         // 
         // Find the matching breakpoint.
         // 
 
-        const VSGDBCore::U64 Rip = Registers.Value.Rip;
         bool BreakpointFound = false;
         VSGDBCore::U32 BreakpointId = 0;
 
@@ -1253,9 +1288,13 @@ CommandProcessor::ReportStopReason(
             auto Iterator = std::find_if(
                 Breakpoints.Value.begin(),
                 Breakpoints.Value.end(),
-                [Rip](const auto& bp)
+                [Rip](const VSGDBCore::BreakpointInfo& bp)
                 {
-                    return bp.Address == Rip;
+                    return
+                        bp.Enabled &&
+                        bp.Kind == VSGDBCore::BreakpointKind::Software &&
+                        bp.Size == 1 &&
+                        bp.Address == Rip;
                 });
 
             if (Iterator != Breakpoints.Value.end())
@@ -1270,14 +1309,26 @@ CommandProcessor::ReportStopReason(
             std::wprintf(
                 L"Hit breakpoint %u at %s\n",
                 BreakpointId,
-                Formatter->FormatAddressInline(Rip).c_str());
+                FormattedAddress.c_str());
         }
         else
         {
             std::wprintf(
-                L"Hit breakpoint unknown at %s\n",
-                Formatter->FormatAddressInline(Rip).c_str());
+                L"Hit unknown breakpoint at %s\n",
+                FormattedAddress.c_str());
         }
+    }
+    else if (Event.StopReason == VSGDBCore::DebugStopReason::Signal)
+    {
+        std::wprintf(
+            L"Break at %s by signal\n",
+            FormattedAddress.c_str());
+    }
+    else if (Event.StopReason == VSGDBCore::DebugStopReason::Unknown)
+    {
+        std::wprintf(
+            L"Break at %s by unknown reason\n",
+            FormattedAddress.c_str());
     }
 
     //

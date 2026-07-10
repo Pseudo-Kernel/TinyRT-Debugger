@@ -490,39 +490,6 @@ namespace VSGDBCore
         return Target->EnumerateBreakpoints();
     }
 
-#if 0
-    DebugError
-        DebugSession::DisableBreakpointInTarget(
-            BreakpointId Id)
-    {
-        //{
-        //    std::lock_guard<std::mutex> Guard(Lock);
-        //
-        //    DebugError StateError = RequireStoppedLocked();
-        //    if (!StateError.IsSuccess())
-        //    {
-        //        return StateError;
-        //    }
-        //}
-        //
-        //return Target->DisableBreakpointInTarget(Id);
-
-        return DebugError::Failure(
-            ErrorCode::InternalError,
-            L"Not implemented");
-    }
-
-    DebugError
-        DebugSession::EnableBreakpointInTarget(
-            BreakpointId Id)
-    {
-        return DebugError::Failure(
-            ErrorCode::InternalError,
-            L"Not implemented");
-    }
-#endif
-
-
 
     Expected<bool>
         DebugSession::StepOverCurrentSoftwareBreakpointIfNeeded(

@@ -118,21 +118,6 @@ namespace VSGDBCore
             return Error;
         }
 
-        auto Reply = Connection.ReceiveResponsePacket();
-        if (!Reply.HasValue())
-        {
-            return Reply.Error;
-        }
-
-        auto Event = DecodeStopReply(Reply.Value);
-        if (!Event.HasValue())
-        {
-            return Event.Error;
-        }
-
-        LastEvent = Event.Value;
-        HasLastEvent = true;
-
         return DebugError::Success();
     }
 
