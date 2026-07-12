@@ -1,44 +1,21 @@
 
 #include <Windows.h>
+#include <atomic>
+
+#include "SessionHost.h"
+#include "LogUtils.h"
 
 #pragma comment(lib, "VSGDBCore.lib")
 #pragma comment(lib, "diaguids.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-#include "SessionHost.h"
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
+#pragma comment(lib, "uuid.lib")
 
-extern "C"
-__declspec(dllexport)
-int
-VsgdbDebugEngineSmokeTest(
-    const wchar_t* Host,
-    unsigned short Port)
-{
-    if (Host == nullptr || Host[0] == L'\0')
-    {
-        Host = L"localhost";
-    }
 
-    SessionHost HostObject;
-
-    VSGDBCore::DebugError Error =
-        HostObject.Connect(
-            Host,
-            static_cast<VSGDBCore::U16>(Port ? Port : 1234));
-
-    if (!Error.IsSuccess())
-    {
-        return static_cast<int>(Error.Code);
-    }
-
-    Error = HostObject.Disconnect();
-    if (!Error.IsSuccess())
-    {
-        return static_cast<int>(Error.Code);
-    }
-
-    return 0;
-}
+std::atomic<ULONG> g_DllObjectCount = 0;
+std::atomic<ULONG> g_DllLockCount = 0;
 
 
 BOOL APIENTRY DllMain( HMODULE hModule,
@@ -49,11 +26,16 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
+        VsgdbLog(L"DLL_PROCESS_ATTACH\n");
+        break;
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
+        break;
     case DLL_PROCESS_DETACH:
+        VsgdbLog(L"DLL_PROCESS_DETACH\n");
         break;
     }
+
     return TRUE;
 }
 

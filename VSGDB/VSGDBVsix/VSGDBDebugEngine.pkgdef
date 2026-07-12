@@ -1,0 +1,6 @@
+﻿[$RootKey$\CLSID\{c8749761-deb7-44b1-55aa-5f5c9bdb7a11}]
+@="VSGDB Debug Engine"
+
+[$RootKey$\CLSID\{c8749761-deb7-44b1-55aa-5f5c9bdb7a11}\InprocServer32]
+@="$PackageFolder$\VSGDBDebugEngine.dll"
+"ThreadingModel"="Both"

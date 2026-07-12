@@ -71,19 +71,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(VSInstallDir)VSSDK\VisualStudioIntegration\Common\Inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(VSInstallDir)DIA SDK\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(VSInstallDir)VSSDK\VisualStudioIntegration\Common\Inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(VSInstallDir)DIA SDK\lib\amd64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(VSInstallDir)VSSDK\VisualStudioIntegration\Common\Inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(VSInstallDir)DIA SDK\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)VSGDBCore\Include;$(VSInstallDir)VSSDK\VisualStudioIntegration\Common\Inc;$(IncludePath)</IncludePath>
     <LibraryPath>$(VSInstallDir)DIA SDK\lib\amd64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -95,11 +95,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>Exports.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -113,11 +116,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>Exports.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -129,11 +135,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>Exports.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -147,24 +156,38 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>Exports.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DebugEngine.cpp" />
+    <ClCompile Include="DebugEngineClassFactory.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="Exports.cpp" />
+    <ClCompile Include="LogUtils.cpp" />
     <ClCompile Include="SessionHost.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DebugEngine.h" />
+    <ClInclude Include="DebugEngineClassFactory.h" />
+    <ClInclude Include="LogUtils.h" />
     <ClInclude Include="SessionHost.h" />
+    <ClInclude Include="VSGDBDebugEngineGuids.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\VSGDBCore\VSGDBCore.vcxproj">
       <Project>{cb31984d-cbfc-495a-9374-c9b3e93302a9}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Exports.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

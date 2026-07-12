@@ -11,6 +11,7 @@ class SessionHost final
 {
 public:
     SessionHost();
+    ~SessionHost();
 
     VSGDBCore::DebugError Connect(
         const std::wstring& Host,

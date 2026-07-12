@@ -1,0 +1,8 @@
+LIBRARY VSGDBDebugEngine
+
+EXPORTS
+
+DllGetClassObject   PRIVATE ; Linker claims about this
+DllCanUnloadNow     PRIVATE ; Linker claims about this
+
+VsgdbDebugEngineSmokeTest       ; for test only
