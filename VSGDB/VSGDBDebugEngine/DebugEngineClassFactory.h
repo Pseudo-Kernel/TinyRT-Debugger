@@ -34,5 +34,5 @@ public:
         BOOL Lock) override;
 
 private:
-    std::atomic<ULONG> ReferenceCount;
+    std::atomic<ULONG> ReferenceCount_;
 };

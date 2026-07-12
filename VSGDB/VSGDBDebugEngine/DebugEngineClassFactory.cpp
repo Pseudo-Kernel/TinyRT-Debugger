@@ -9,7 +9,7 @@ extern std::atomic<ULONG> g_DllObjectCount;
 extern std::atomic<ULONG> g_DllLockCount;
 
 DebugEngineClassFactory::DebugEngineClassFactory()
-    : ReferenceCount(1)
+    : ReferenceCount_(1)
 {
     g_DllObjectCount.fetch_add(1, std::memory_order_relaxed);
     VsgdbLog(L"DebugEngineClassFactory created");
@@ -41,7 +41,7 @@ DebugEngineClassFactory::QueryInterface(
 ULONG STDMETHODCALLTYPE
 DebugEngineClassFactory::AddRef()
 {
-    return ReferenceCount.fetch_add(
+    return ReferenceCount_.fetch_add(
         1,
         std::memory_order_relaxed) + 1;
 }
@@ -50,7 +50,7 @@ ULONG STDMETHODCALLTYPE
 DebugEngineClassFactory::Release()
 {
     ULONG NewReferenceCount =
-        ReferenceCount.fetch_sub(
+        ReferenceCount_.fetch_sub(
             1,
             std::memory_order_acq_rel) - 1;
 

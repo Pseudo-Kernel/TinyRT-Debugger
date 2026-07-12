@@ -91,7 +91,7 @@ namespace VSGDBCore
 
     DiaSymbolManager::~DiaSymbolManager()
     {
-        LoadedModules.clear();
+        LoadedModules_.clear();
         ::CoUninitialize();
     }
 
@@ -99,7 +99,7 @@ namespace VSGDBCore
         DiaSymbolManager::LoadSymbolsForModule(
             const ModuleInfo& Module)
     {
-        for (const LoadedModule& Existing : LoadedModules)
+        for (const LoadedModule& Existing : LoadedModules_)
         {
             if (Existing.Module.Id == Module.Id)
             {
@@ -184,7 +184,7 @@ namespace VSGDBCore
         Loaded.Session = std::move(Session);
         Loaded.GlobalScope = std::move(GlobalScope);
 
-        LoadedModules.push_back(std::move(Loaded));
+        LoadedModules_.push_back(std::move(Loaded));
 
         return DebugError::Success();
     }
@@ -195,21 +195,21 @@ namespace VSGDBCore
     {
         const auto Iterator =
             std::find_if(
-                LoadedModules.begin(),
-                LoadedModules.end(),
+                LoadedModules_.begin(),
+                LoadedModules_.end(),
                 [ModuleId](const LoadedModule& Module)
                 {
                     return Module.Module.Id == ModuleId;
                 });
 
-        if (Iterator == LoadedModules.end())
+        if (Iterator == LoadedModules_.end())
         {
             return DebugError::Failure(
                 ErrorCode::InvalidArgument,
                 L"Module symbols were not loaded.");
         }
 
-        LoadedModules.erase(Iterator);
+        LoadedModules_.erase(Iterator);
 
         return DebugError::Success();
     }
@@ -319,7 +319,7 @@ namespace VSGDBCore
         DiaSymbolManager::GetSymbolByName(
             const std::wstring& Name) const
     {
-        for (const LoadedModule& Loaded : LoadedModules)
+        for (const LoadedModule& Loaded : LoadedModules_)
         {
             for (const DiaSymbolTagPolicy& Policy : g_DiaSymbolSearchTags)
             {
@@ -536,7 +536,7 @@ namespace VSGDBCore
         DiaSymbolManager::FindLoadedModuleByAddress(
             U64 Address) const
     {
-        for (const LoadedModule& Loaded : LoadedModules)
+        for (const LoadedModule& Loaded : LoadedModules_)
         {
             if (Loaded.Module.Size == 0)
             {
@@ -565,7 +565,7 @@ namespace VSGDBCore
         DiaSymbolManager::FindLoadedModuleById(
             ModuleId ModuleId) const
     {
-        for (const LoadedModule& Loaded : LoadedModules)
+        for (const LoadedModule& Loaded : LoadedModules_)
         {
             if (Loaded.Module.Id == ModuleId)
             {

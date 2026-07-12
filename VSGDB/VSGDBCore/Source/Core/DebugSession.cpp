@@ -5,7 +5,7 @@
 namespace VSGDBCore
 {
     DebugSession::DebugSession()
-        : Target(CreateGdbRemoteTarget())
+        : Target_(CreateGdbRemoteTarget())
     {
     }
 
@@ -62,7 +62,7 @@ namespace VSGDBCore
         Config.Host = Options.Host;
         Config.Port = Options.Port;
 
-        DebugError Error = Target->Connect(Config);
+        DebugError Error = Target_->Connect(Config);
         if (!Error.IsSuccess())
         {
             return Error;
@@ -90,7 +90,7 @@ namespace VSGDBCore
             State = DebugSessionState::Disconnected;
         }
 
-        return Target->Disconnect();
+        return Target_->Disconnect();
     }
 
     DebugError
@@ -119,7 +119,7 @@ namespace VSGDBCore
             return SteppedOver.Error;
         }
 
-        DebugError Error = Target->Continue(CpuId);
+        DebugError Error = Target_->Continue(CpuId);
         if (!Error.IsSuccess())
         {
             std::lock_guard<std::mutex> Guard(Lock);
@@ -145,7 +145,7 @@ namespace VSGDBCore
             State = DebugSessionState::Running;
         }
 
-        DebugError Error = Target->ContinueAll();
+        DebugError Error = Target_->ContinueAll();
         if (!Error.IsSuccess())
         {
             std::lock_guard<std::mutex> Guard(Lock);
@@ -189,7 +189,7 @@ namespace VSGDBCore
             return DebugError::Success();
         }
 
-        DebugError Error = Target->StepInto(CpuId);
+        DebugError Error = Target_->StepInto(CpuId);
         if (!Error.IsSuccess())
         {
             std::lock_guard<std::mutex> Guard(Lock);
@@ -216,7 +216,7 @@ namespace VSGDBCore
             State = DebugSessionState::StopPending;
         }
 
-        DebugError Error = Target->Break();
+        DebugError Error = Target_->Break();
         if (!Error.IsSuccess())
         {
             std::lock_guard<std::mutex> Guard(Lock);
@@ -241,7 +241,7 @@ namespace VSGDBCore
             }
         }
 
-        auto Event = Target->WaitForEvent(TimeoutMilliseconds);
+        auto Event = Target_->WaitForEvent(TimeoutMilliseconds);
         if (!Event.HasValue())
         {
             return Event;
@@ -277,7 +277,7 @@ namespace VSGDBCore
             }
         }
 
-        return Target->EnumerateThreads();
+        return Target_->EnumerateThreads();
     }
 
     Expected<RegisterContext>
@@ -294,7 +294,7 @@ namespace VSGDBCore
             }
         }
 
-        return Target->GetRegisters(CpuId);
+        return Target_->GetRegisters(CpuId);
     }
 
     Expected<ByteVector>
@@ -313,7 +313,7 @@ namespace VSGDBCore
             }
         }
 
-        return Target->ReadVirtualMemory(
+        return Target_->ReadVirtualMemory(
             CpuId,
             Address,
             Size);
@@ -334,7 +334,7 @@ namespace VSGDBCore
             }
         }
 
-        return Target->ReadPhysicalMemory(
+        return Target_->ReadPhysicalMemory(
             Address,
             Size);
     }
@@ -345,7 +345,7 @@ namespace VSGDBCore
     Expected<DebugEvent>
         DebugSession::GetLastEvent() const
     {
-        //return Target->GetLastEvent();
+        //return Target_->GetLastEvent();
         return Expected<DebugEvent>::Failure(
             DebugError::Failure(
                 ErrorCode::InternalError, 
@@ -368,7 +368,7 @@ namespace VSGDBCore
             }
         }
 
-        auto Id = Target->SetBreakpoint(
+        auto Id = Target_->SetBreakpoint(
             Kind,
             Address,
             Size);
@@ -378,7 +378,7 @@ namespace VSGDBCore
             return Expected<BreakpointInfo>::Failure(Id.Error);
         }
 
-        auto Breakpoints = Target->EnumerateBreakpoints();
+        auto Breakpoints = Target_->EnumerateBreakpoints();
         if (!Breakpoints.HasValue())
         {
             return Expected<BreakpointInfo>::Failure(Breakpoints.Error);
@@ -412,7 +412,7 @@ namespace VSGDBCore
             }
         }
 
-        return Target->DeleteBreakpoint(Id);
+        return Target_->DeleteBreakpoint(Id);
     }
 
     DebugError
@@ -428,7 +428,7 @@ namespace VSGDBCore
             }
         }
 
-        return Target->DeleteAllBreakpoints();
+        return Target_->DeleteAllBreakpoints();
     }
 
     DebugError
@@ -447,7 +447,7 @@ namespace VSGDBCore
             }
         }
 
-        auto Breakpoints = Target->EnumerateBreakpoints();
+        auto Breakpoints = Target_->EnumerateBreakpoints();
         if (!Breakpoints.HasValue())
         {
             return Breakpoints.Error;
@@ -464,7 +464,7 @@ namespace VSGDBCore
                 Breakpoint.Address == Address &&
                 Breakpoint.Size == Size)
             {
-                return Target->DeleteBreakpoint(Breakpoint.Id);
+                return Target_->DeleteBreakpoint(Breakpoint.Id);
             }
         }
 
@@ -487,7 +487,7 @@ namespace VSGDBCore
             }
         }
 
-        return Target->EnumerateBreakpoints();
+        return Target_->EnumerateBreakpoints();
     }
 
 
@@ -495,7 +495,7 @@ namespace VSGDBCore
         DebugSession::StepOverCurrentSoftwareBreakpointIfNeeded(
             U32 CpuId)
     {
-        auto Registers = Target->GetRegisters(CpuId);
+        auto Registers = Target_->GetRegisters(CpuId);
         if (!Registers.HasValue())
         {
             return Expected<bool>::Failure(Registers.Error);
@@ -503,7 +503,7 @@ namespace VSGDBCore
 
         const U64 Rip = Registers.Value.Rip;
 
-        auto Breakpoints = Target->EnumerateBreakpoints();
+        auto Breakpoints = Target_->EnumerateBreakpoints();
         if (!Breakpoints.HasValue())
         {
             return Expected<bool>::Failure(Breakpoints.Error);
@@ -532,7 +532,7 @@ namespace VSGDBCore
         for (BreakpointId Id : DisabledBreakpointIds)
         {
             DebugError Error =
-                Target->DisableBreakpointInTarget(Id);
+                Target_->DisableBreakpointInTarget(Id);
 
             if (!Error.IsSuccess())
             {
@@ -541,7 +541,7 @@ namespace VSGDBCore
         }
 
         DebugError StepError =
-            Target->StepInto(CpuId);
+            Target_->StepInto(CpuId);
 
         DebugError FirstEnableError =
             DebugError::Success();
@@ -549,7 +549,7 @@ namespace VSGDBCore
         for (BreakpointId Id : DisabledBreakpointIds)
         {
             DebugError Error =
-                Target->EnableBreakpointInTarget(Id);
+                Target_->EnableBreakpointInTarget(Id);
 
             if (!Error.IsSuccess() &&
                 FirstEnableError.IsSuccess())

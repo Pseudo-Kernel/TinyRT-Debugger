@@ -37,22 +37,22 @@ public:
     ScopedTargetRunning(
         std::atomic_bool& TargetRunning,
         std::atomic_bool& BreakRequested)
-        : TargetRunning(TargetRunning),
-        BreakRequested(BreakRequested)
+        : TargetRunning_(TargetRunning),
+        BreakRequested_(BreakRequested)
     {
-        this->BreakRequested.store(false, std::memory_order_release);
-        this->TargetRunning.store(true, std::memory_order_release);
+        this->BreakRequested_.store(false, std::memory_order_release);
+        this->TargetRunning_.store(true, std::memory_order_release);
     }
 
     ~ScopedTargetRunning()
     {
-        TargetRunning.store(false, std::memory_order_release);
-        BreakRequested.store(false, std::memory_order_release);
+        TargetRunning_.store(false, std::memory_order_release);
+        BreakRequested_.store(false, std::memory_order_release);
     }
 
 private:
-    std::atomic_bool& TargetRunning;
-    std::atomic_bool& BreakRequested;
+    std::atomic_bool& TargetRunning_;
+    std::atomic_bool& BreakRequested_;
 };
 
 
@@ -252,16 +252,16 @@ CommandProcessor::CommandProcessor(
     std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager,
     std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager,
     std::unique_ptr<VSGDBCore::IStackWalker> StackWalker) :
-    Session(std::move(Session)),
-    Disassembler(std::move(Disassembler)),
-    ModuleManager(std::move(ModuleManager)),
-    SymbolManager(std::move(SymbolManager)),
-    StackWalker(std::move(StackWalker)),
-    Formatter()
+    Session_(std::move(Session)),
+    Disassembler_(std::move(Disassembler)),
+    ModuleManager_(std::move(ModuleManager)),
+    SymbolManager_(std::move(SymbolManager)),
+    StackWalker_(std::move(StackWalker)),
+    Formatter_()
 {
-    Formatter = std::make_unique<DebugTextFormatter>(
-        this->ModuleManager.get(),
-        this->SymbolManager.get());
+    Formatter_ = std::make_unique<DebugTextFormatter>(
+        this->ModuleManager_.get(),
+        this->SymbolManager_.get());
 }
 
 int
@@ -269,11 +269,11 @@ CommandProcessor::Run()
 {
     std::wprintf(L"Type 'help' for commands.\n");
 
-    while (!QuitRequested)
+    while (!QuitRequested_)
     {
         std::wprintf(
             L"vsgdb:cpu%u> ",
-            CurrentCpuId);
+            CurrentCpuId_);
 
         std::wstring Line;
         if (!std::getline(std::wcin, Line))
@@ -296,13 +296,13 @@ CommandProcessor::RequestBreakFromConsoleControlHandler()
     // Console control handler runs on a different thread.
     // Only send break if the target is currently running.
     //
-    if (!TargetRunning.load(std::memory_order_acquire))
+    if (!TargetRunning_.load(std::memory_order_acquire))
     {
         return false;
     }
 
     bool Expected = false;
-    if (!BreakRequested.compare_exchange_strong(
+    if (!BreakRequested_.compare_exchange_strong(
         Expected,
         true,
         std::memory_order_acq_rel))
@@ -314,7 +314,7 @@ CommandProcessor::RequestBreakFromConsoleControlHandler()
     // Send raw 0x03 to the GDB remote target.
     // Do not print here. Keep the console control handler path minimal.
     //
-    auto Error = Session->BreakExecution();
+    auto Error = Session_->BreakExecution();
     (void)Error;
 
     return true;
@@ -530,15 +530,15 @@ CommandProcessor::ExecuteScript(
         return false;
     }
 
-    if (ScriptDepth >= MaxCommandScriptDepth)
+    if (ScriptDepth_ >= MaxCommandScriptDepth)
     {
         std::wprintf(L"Command script nesting is too deep.\n");
         return false;
     }
 
-    ++ScriptDepth;
+    ++ScriptDepth_;
     const bool Result = ExecuteCommandScript(*this, Arguments[1]);
-    --ScriptDepth;
+    --ScriptDepth_;
 
     return Result;
 }
@@ -551,7 +551,7 @@ CommandProcessor::ExecuteQuit(
 
     ClearAllKnownBreakpoints();
 
-    QuitRequested = true;
+    QuitRequested_ = true;
     return true;
 }
 
@@ -565,7 +565,7 @@ CommandProcessor::ExecuteThreads(
         return false;
     }
 
-    auto Threads = Session->EnumerateThreads();
+    auto Threads = Session_->EnumerateThreads();
     if (!Threads.HasValue())
     {
         PrintDebugError(L"EnumerateThreads failed", Threads.Error);
@@ -576,7 +576,7 @@ CommandProcessor::ExecuteThreads(
     {
         std::wprintf(
             L"%c CPU%u -> %s\n",
-            Thread.CpuId == CurrentCpuId ? L'*' : L' ',
+            Thread.CpuId == CurrentCpuId_ ? L'*' : L' ',
             Thread.CpuId,
             Thread.DisplayName.c_str());
     }
@@ -592,7 +592,7 @@ CommandProcessor::ExecuteCpu(
     {
         std::wprintf(
             L"Current CPU = %u\n",
-            CurrentCpuId);
+            CurrentCpuId_);
 
         return true;
     }
@@ -613,7 +613,7 @@ CommandProcessor::ExecuteCpu(
         return false;
     }
 
-    auto Threads = Session->EnumerateThreads();
+    auto Threads = Session_->EnumerateThreads();
     if (!Threads.HasValue())
     {
         PrintDebugError(L"EnumerateThreads failed", Threads.Error);
@@ -640,11 +640,11 @@ CommandProcessor::ExecuteCpu(
         return false;
     }
 
-    CurrentCpuId = CpuId;
+    CurrentCpuId_ = CpuId;
 
     std::wprintf(
         L"Current CPU = %u\n",
-        CurrentCpuId);
+        CurrentCpuId_);
 
     return true;
 }
@@ -659,7 +659,7 @@ CommandProcessor::ExecuteRegisters(
         return false;
     }
 
-    auto Registers = Session->GetRegisters(CurrentCpuId);
+    auto Registers = Session_->GetRegisters(CurrentCpuId_);
     if (!Registers.HasValue())
     {
         PrintDebugError(L"GetRegisters failed", Registers.Error);
@@ -668,7 +668,7 @@ CommandProcessor::ExecuteRegisters(
 
     if (Arguments.size() == 1)
     {
-        Formatter->PrintRegisters(Registers.Value);
+        Formatter_->PrintRegisters(Registers.Value);
         return true;
     }
 
@@ -676,7 +676,7 @@ CommandProcessor::ExecuteRegisters(
 
     for (size_t Index = 1; Index < Arguments.size(); ++Index)
     {
-        if (!Formatter->PrintRegisterByName(
+        if (!Formatter_->PrintRegisterByName(
             Registers.Value,
             Arguments[Index]))
         {
@@ -702,10 +702,10 @@ CommandProcessor::ExecuteDumpVirtualBytes(
     }
 
     auto Address = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[1],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!Address.HasValue())
     {
@@ -731,8 +731,8 @@ CommandProcessor::ExecuteDumpVirtualBytes(
         return false;
     }
 
-    auto Bytes = Session->ReadVirtualMemory(
-        CurrentCpuId,
+    auto Bytes = Session_->ReadVirtualMemory(
+        CurrentCpuId_,
         Address.Value,
         static_cast<VSGDBCore::U32>(Size64));
 
@@ -745,7 +745,7 @@ CommandProcessor::ExecuteDumpVirtualBytes(
     std::wprintf(
         L"Dumping %u bytes from %s\n",
         static_cast<VSGDBCore::U32>(Size64),
-        Formatter->FormatAddressInline(Address.Value).c_str());
+        Formatter_->FormatAddressInline(Address.Value).c_str());
 
     PrintHexDump(
         Address.Value,
@@ -765,10 +765,10 @@ CommandProcessor::ExecuteDumpPhysicalBytes(
     }
 
     auto Address = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[1],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!Address.HasValue())
     {
@@ -794,7 +794,7 @@ CommandProcessor::ExecuteDumpPhysicalBytes(
         return false;
     }
 
-    auto Bytes = Session->ReadPhysicalMemory(
+    auto Bytes = Session_->ReadPhysicalMemory(
         Address.Value,
         static_cast<VSGDBCore::U32>(Size64));
 
@@ -822,10 +822,10 @@ CommandProcessor::ExecutePte(
     }
 
     auto VirtualAddress = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[1],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!VirtualAddress.HasValue())
     {
@@ -836,7 +836,7 @@ CommandProcessor::ExecutePte(
         return false;
     }
 
-    auto Registers = Session->GetRegisters(CurrentCpuId);
+    auto Registers = Session_->GetRegisters(CurrentCpuId_);
     if (!Registers.HasValue())
     {
         PrintDebugError(
@@ -853,7 +853,7 @@ CommandProcessor::ExecutePte(
     Paging.Efer = Registers.Value.Efer;
 
     auto Translation = VSGDBCore::TranslateX64VirtualAddress(
-        *Session,
+        *Session_,
         Paging,
         VirtualAddress.Value);
 
@@ -866,7 +866,7 @@ CommandProcessor::ExecutePte(
         return false;
     }
 
-    Formatter->PrintTranslation(Translation.Value);
+    Formatter_->PrintTranslation(Translation.Value);
     return true;
 }
 
@@ -881,10 +881,10 @@ CommandProcessor::ExecutePageFault(
     }
 
     auto VirtualAddress = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[1],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!VirtualAddress.HasValue())
     {
@@ -896,10 +896,10 @@ CommandProcessor::ExecutePageFault(
     }
 
     auto ErrorCode = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[2],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!ErrorCode.HasValue())
     {
@@ -910,7 +910,7 @@ CommandProcessor::ExecutePageFault(
         return false;
     }
 
-    auto Registers = Session->GetRegisters(CurrentCpuId);
+    auto Registers = Session_->GetRegisters(CurrentCpuId_);
     if (!Registers.HasValue())
     {
         PrintDebugError(
@@ -927,7 +927,7 @@ CommandProcessor::ExecutePageFault(
     Paging.Efer = Registers.Value.Efer;
 
     auto Translation = VSGDBCore::TranslateX64VirtualAddress(
-        *Session,
+        *Session_,
         Paging,
         VirtualAddress.Value);
 
@@ -940,14 +940,14 @@ CommandProcessor::ExecutePageFault(
         return false;
     }
 
-    Formatter->PrintTranslation(Translation.Value);
+    Formatter_->PrintTranslation(Translation.Value);
 
     const auto Analysis = VSGDBCore::AnalyzeX64PageFault(
         Paging,
         Translation.Value,
         ErrorCode.Value);
 
-    Formatter->PrintPageFaultAnalysis(Analysis);
+    Formatter_->PrintPageFaultAnalysis(Analysis);
 
     return true;
 }
@@ -962,22 +962,22 @@ CommandProcessor::ExecuteStep(
         return false;
     }
 
-    VSGDBCore::DebugError Error = Session->StepInto(CurrentCpuId);
+    VSGDBCore::DebugError Error = Session_->StepInto(CurrentCpuId_);
     if (!Error.IsSuccess())
     {
         PrintDebugError(L"Failed to step", Error);
         return false;
     }
 
-    auto SessionState = Session->GetState();
+    auto SessionState = Session_->GetState();
     if (SessionState == VSGDBCore::DebugSessionState::Running ||
         SessionState == VSGDBCore::DebugSessionState::StopPending)
     {
         ScopedTargetRunning RunningGuard(
-            TargetRunning,
-            BreakRequested);
+            TargetRunning_,
+            BreakRequested_);
 
-        auto Event = Session->WaitForEvent(INFINITE);
+        auto Event = Session_->WaitForEvent(INFINITE);
         if (!Event.HasValue())
         {
             PrintDebugError(L"Failed to wait for debug event", Event.Error);
@@ -1002,21 +1002,21 @@ CommandProcessor::ExecuteGo(
     }
 
     ScopedTargetRunning RunningGuard(
-        TargetRunning,
-        BreakRequested);
+        TargetRunning_,
+        BreakRequested_);
 
-    VSGDBCore::DebugError Error = Session->Continue(CurrentCpuId);
+    VSGDBCore::DebugError Error = Session_->Continue(CurrentCpuId_);
     if (!Error.IsSuccess())
     {
         PrintDebugError(L"Failed to continue", Error);
         return false;
     }
 
-    auto SessionState = Session->GetState();
+    auto SessionState = Session_->GetState();
     if (SessionState == VSGDBCore::DebugSessionState::Running ||
         SessionState == VSGDBCore::DebugSessionState::StopPending)
     {
-        auto Event = Session->WaitForEvent(INFINITE);
+        auto Event = Session_->WaitForEvent(INFINITE);
         if (!Event.HasValue())
         {
             PrintDebugError(L"Failed to wait for debug event", Event.Error);
@@ -1041,10 +1041,10 @@ CommandProcessor::ExecuteBreakpointSet(
     }
 
     auto Address = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[1],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!Address.HasValue())
     {
@@ -1055,7 +1055,7 @@ CommandProcessor::ExecuteBreakpointSet(
         return false;
     }
 
-    auto Breakpoint = Session->SetBreakpoint(
+    auto Breakpoint = Session_->SetBreakpoint(
         VSGDBCore::BreakpointKind::Software,
         Address.Value,
         1);
@@ -1072,7 +1072,7 @@ CommandProcessor::ExecuteBreakpointSet(
     std::wprintf(
         L"Breakpoint %u set at %s\n",
         Breakpoint.Value.Id,
-        Formatter->FormatAddressInline(
+        Formatter_->FormatAddressInline(
             Breakpoint.Value.Address).c_str());
 
     return true;
@@ -1093,7 +1093,7 @@ CommandProcessor::ExecuteBreakpointList(
     std::wprintf(
         L"Id  Address             Size  Kind       State     Symbol\n");
 
-    auto Breakpoints = Session->EnumerateBreakpoints();
+    auto Breakpoints = Session_->EnumerateBreakpoints();
 
     if (!Breakpoints.HasValue())
     {
@@ -1113,7 +1113,7 @@ CommandProcessor::ExecuteBreakpointList(
 
         Any = true;
 
-        AddressLabel Label = Formatter->FormatAddressLabel(Breakpoint.Address);
+        AddressLabel Label = Formatter_->FormatAddressLabel(Breakpoint.Address);
 
         std::wprintf(
             L"%-3u 0x%016llx  %-4u %-10s %-8s",
@@ -1172,7 +1172,7 @@ CommandProcessor::ExecuteBreakpointClear(
         static_cast<VSGDBCore::BreakpointId>(Id32);
 
     VSGDBCore::DebugError Error =
-        Session->DeleteBreakpoint(BreakpointId);
+        Session_->DeleteBreakpoint(BreakpointId);
 
     if (!Error.IsSuccess())
     {
@@ -1199,7 +1199,7 @@ CommandProcessor::TryUpdateCurrentCpuFromStopEvent(
         return false;
     }
 
-    auto Threads = Session->EnumerateThreads();
+    auto Threads = Session_->EnumerateThreads();
     if (!Threads.HasValue())
     {
         return false;
@@ -1211,7 +1211,7 @@ CommandProcessor::TryUpdateCurrentCpuFromStopEvent(
             Thread.RemoteThreadId,
             Event.RemoteThreadId))
         {
-            CurrentCpuId = Thread.CpuId;
+            CurrentCpuId_ = Thread.CpuId;
             return true;
         }
     }
@@ -1232,7 +1232,7 @@ CommandProcessor::ReportStopReason(
         return;
     }
 
-    auto Threads = Session->EnumerateThreads();
+    auto Threads = Session_->EnumerateThreads();
     if (!Threads.HasValue())
     {
         return;
@@ -1258,14 +1258,14 @@ CommandProcessor::ReportStopReason(
         return;
     }
 
-    auto Registers = Session->GetRegisters(StoppedCpuId);
+    auto Registers = Session_->GetRegisters(StoppedCpuId);
     if (!Registers.HasValue())
     {
         return;
     }
 
     const VSGDBCore::U64 Rip = Registers.Value.Rip;
-    auto FormattedAddress = Formatter->FormatAddressInline(Rip);
+    auto FormattedAddress = Formatter_->FormatAddressInline(Rip);
 
     if (Event.StopReason == VSGDBCore::DebugStopReason::Breakpoint)
     {
@@ -1276,7 +1276,7 @@ CommandProcessor::ReportStopReason(
         bool BreakpointFound = false;
         VSGDBCore::U32 BreakpointId = 0;
 
-        auto Breakpoints = Session->EnumerateBreakpoints();
+        auto Breakpoints = Session_->EnumerateBreakpoints();
         if (!Breakpoints.HasValue())
         {
             std::wprintf(
@@ -1342,7 +1342,7 @@ void
 CommandProcessor::ClearAllKnownBreakpoints()
 {
     VSGDBCore::DebugError Error =
-        Session->DeleteAllBreakpoints();
+        Session_->DeleteAllBreakpoints();
 
     if (!Error.IsSuccess())
     {
@@ -1364,10 +1364,10 @@ CommandProcessor::ExecuteBreakpointClearAddress(
     }
 
     auto Address = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[1],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!Address.HasValue())
     {
@@ -1378,7 +1378,7 @@ CommandProcessor::ExecuteBreakpointClearAddress(
         return false;
     }
 
-    auto Error = Session->DeleteBreakpointByAddress(
+    auto Error = Session_->DeleteBreakpointByAddress(
         VSGDBCore::BreakpointKind::Software,
         Address.Value,
         1);
@@ -1402,15 +1402,15 @@ CommandProcessor::ExecuteBreakpointClearAddress(
 bool
 CommandProcessor::ContinueAllAndReportStop()
 {
-    BreakRequested.store(false, std::memory_order_release);
-    TargetRunning.store(true, std::memory_order_release);
+    BreakRequested_.store(false, std::memory_order_release);
+    TargetRunning_.store(true, std::memory_order_release);
 
-    auto Error = Session->ContinueAll();
+    auto Error = Session_->ContinueAll();
 
-    TargetRunning.store(false, std::memory_order_release);
+    TargetRunning_.store(false, std::memory_order_release);
 
     const bool WasBreakRequested =
-        BreakRequested.load(std::memory_order_acquire);
+        BreakRequested_.load(std::memory_order_acquire);
 
     if (!Error.IsSuccess())
     {
@@ -1418,7 +1418,7 @@ CommandProcessor::ContinueAllAndReportStop()
         return false;
     }
 
-    auto Event = Session->GetLastEvent();
+    auto Event = Session_->GetLastEvent();
     if (Event.HasValue())
     {
         PrintStopEvent(Event.Value);
@@ -1444,7 +1444,7 @@ CommandProcessor::ExecuteDisassemble(
         return false;
     }
 
-    if (!Disassembler)
+    if (!Disassembler_)
     {
         std::wprintf(L"No disassembler is available.\n");
         return false;
@@ -1458,10 +1458,10 @@ CommandProcessor::ExecuteDisassemble(
     }
 
     auto Address = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         AddressExpression,
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!Address.HasValue())
     {
@@ -1477,8 +1477,8 @@ CommandProcessor::ExecuteDisassemble(
     if (Arguments.size() == 3)
     {
         auto EvalResult = EvaluateSimpleExpression(
-            *Session,
-            CurrentCpuId,
+            *Session_,
+            CurrentCpuId_,
             Arguments[2],
             nullptr);
 
@@ -1512,7 +1512,7 @@ CommandProcessor::ExecuteDisassemble(
 
     VSGDBCore::U64 CurrentRip = 0;
 
-    auto Registers = Session->GetRegisters(CurrentCpuId);
+    auto Registers = Session_->GetRegisters(CurrentCpuId_);
 
     if (Registers.HasValue())
     {
@@ -1537,7 +1537,7 @@ CommandProcessor::ExecuteDisassembleFunction(
         return false;
     }
 
-    auto Registers = Session->GetRegisters(CurrentCpuId);
+    auto Registers = Session_->GetRegisters(CurrentCpuId_);
 
     if (!Registers.HasValue())
     {
@@ -1550,10 +1550,10 @@ CommandProcessor::ExecuteDisassembleFunction(
     if (Arguments.size() == 2)
     {
         auto Evaluated = EvaluateSimpleExpression(
-            *Session,
-            CurrentCpuId,
+            *Session_,
+            CurrentCpuId_,
             Arguments[1],
-            SymbolManager.get());
+            SymbolManager_.get());
 
         if (!Evaluated.HasValue())
         {
@@ -1564,13 +1564,13 @@ CommandProcessor::ExecuteDisassembleFunction(
         Address = Evaluated.Value;
     }
 
-    if (!SymbolManager)
+    if (!SymbolManager_)
     {
         std::wprintf(L"No symbol manager is available.\n");
         return false;
     }
 
-    auto Symbol = SymbolManager->GetSymbolByAddress(Address);
+    auto Symbol = SymbolManager_->GetSymbolByAddress(Address);
 
     if (!Symbol.HasValue())
     {
@@ -1611,7 +1611,7 @@ CommandProcessor::ExecuteDisassembleBackwardWindow(
         return false;
     }
 
-    auto Registers = Session->GetRegisters(CurrentCpuId);
+    auto Registers = Session_->GetRegisters(CurrentCpuId_);
 
     if (!Registers.HasValue())
     {
@@ -1625,10 +1625,10 @@ CommandProcessor::ExecuteDisassembleBackwardWindow(
     if (Arguments.size() >= 2)
     {
         auto Evaluated = EvaluateSimpleExpression(
-            *Session,
-            CurrentCpuId,
+            *Session_,
+            CurrentCpuId_,
             Arguments[1],
-            SymbolManager.get());
+            SymbolManager_.get());
 
         if (!Evaluated.HasValue())
         {
@@ -1642,10 +1642,10 @@ CommandProcessor::ExecuteDisassembleBackwardWindow(
     if (Arguments.size() >= 3)
     {
         auto EvaluatedSize = EvaluateSimpleExpression(
-            *Session,
-            CurrentCpuId,
+            *Session_,
+            CurrentCpuId_,
             Arguments[2],
-            SymbolManager.get());
+            SymbolManager_.get());
 
         if (!EvaluatedSize.HasValue())
         {
@@ -1663,7 +1663,7 @@ CommandProcessor::ExecuteDisassembleBackwardWindow(
         WindowBytes = static_cast<VSGDBCore::U32>(EvaluatedSize.Value);
     }
 
-    auto Symbol = SymbolManager->GetSymbolByAddress(TargetAddress);
+    auto Symbol = SymbolManager_->GetSymbolByAddress(TargetAddress);
 
     if (!Symbol.HasValue())
     {
@@ -1713,7 +1713,7 @@ CommandProcessor::ExecuteListModules(
 {
     UNREFERENCED_PARAMETER(Arguments);
 
-    const auto Modules = ModuleManager->EnumerateModules();
+    const auto Modules = ModuleManager_->EnumerateModules();
 
     if (Modules.empty())
     {
@@ -1764,10 +1764,10 @@ CommandProcessor::ExecuteReload(
     const std::wstring& ImagePath = Arguments[1];
 
     auto Base = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[2],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!Base.HasValue())
     {
@@ -1780,8 +1780,8 @@ CommandProcessor::ExecuteReload(
     if (Arguments.size() == 4)
     {
         auto SizeResult = EvaluateSimpleExpression(
-            *Session,
-            CurrentCpuId,
+            *Session_,
+            CurrentCpuId_,
             Arguments[3],
             nullptr);
 
@@ -1818,7 +1818,7 @@ CommandProcessor::ExecuteReload(
     Module.BaseAddress = Base.Value;
     Module.Size = Size;
 
-    auto ModuleId = ModuleManager->AddModule(Module);
+    auto ModuleId = ModuleManager_->AddModule(Module);
 
     if (!ModuleId.HasValue())
     {
@@ -1861,10 +1861,10 @@ CommandProcessor::ExecuteSymbolLoad(
     VSGDBCore::U64 ModuleIdValue = 0;
 
     auto ParsedId = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         Arguments[1],
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!ParsedId.HasValue())
     {
@@ -1881,7 +1881,7 @@ CommandProcessor::ExecuteSymbolLoad(
         return false;
     }
 
-    auto Module = ModuleManager->GetModuleById(
+    auto Module = ModuleManager_->GetModuleById(
         static_cast<VSGDBCore::ModuleId>(ModuleIdValue));
 
     if (!Module.HasValue())
@@ -1891,7 +1891,7 @@ CommandProcessor::ExecuteSymbolLoad(
     }
 
     VSGDBCore::DebugError Error =
-        SymbolManager->LoadSymbolsForModule(Module.Value);
+        SymbolManager_->LoadSymbolsForModule(Module.Value);
 
     if (!Error.IsSuccess())
     {
@@ -1916,13 +1916,13 @@ CommandProcessor::ExecuteSymbolLookup(
         return false;
     }
 
-    if (!SymbolManager)
+    if (!SymbolManager_)
     {
         std::wprintf(L"No symbol manager is available.\n");
         return false;
     }
 
-    auto Symbol = SymbolManager->GetSymbolByName(
+    auto Symbol = SymbolManager_->GetSymbolByName(
         Arguments[1]);
 
     if (!Symbol.HasValue())
@@ -1936,9 +1936,9 @@ CommandProcessor::ExecuteSymbolLookup(
 
     std::wstring ModuleName = L"?";
 
-    if (ModuleManager)
+    if (ModuleManager_)
     {
-        auto Module = ModuleManager->GetModuleById(
+        auto Module = ModuleManager_->GetModuleById(
             Symbol.Value.ModuleId);
 
         if (Module.HasValue())
@@ -1986,8 +1986,8 @@ CommandProcessor::DisassembleRange(
     const VSGDBCore::U32 ReadSize =
         ByteCount + MaxInstructionLength;
 
-    auto Bytes = Session->ReadVirtualMemory(
-        CurrentCpuId,
+    auto Bytes = Session_->ReadVirtualMemory(
+        CurrentCpuId_,
         StartAddress,
         ReadSize);
 
@@ -1997,7 +1997,7 @@ CommandProcessor::DisassembleRange(
         return false;
     }
 
-    auto Instructions = Disassembler->Disassemble(
+    auto Instructions = Disassembler_->Disassemble(
         StartAddress,
         Bytes.Value,
         4096);
@@ -2031,7 +2031,7 @@ CommandProcessor::DisassembleRange(
         CurrentRip,
         [this](VSGDBCore::U64 Address)
         {
-            return Formatter->FormatAddressLabel(Address);
+            return Formatter_->FormatAddressLabel(Address);
         });
 
     return true;
@@ -2047,7 +2047,7 @@ CommandProcessor::ExecuteSourceLine(
         return false;
     }
 
-    if (!SymbolManager)
+    if (!SymbolManager_)
     {
         std::wprintf(L"No symbol manager is available.\n");
         return false;
@@ -2061,10 +2061,10 @@ CommandProcessor::ExecuteSourceLine(
     }
 
     auto Address = EvaluateSimpleExpression(
-        *Session,
-        CurrentCpuId,
+        *Session_,
+        CurrentCpuId_,
         AddressExpression,
-        SymbolManager.get());
+        SymbolManager_.get());
 
     if (!Address.HasValue())
     {
@@ -2076,7 +2076,7 @@ CommandProcessor::ExecuteSourceLine(
     }
 
     auto Location =
-        SymbolManager->GetSourceLocationByAddress(Address.Value);
+        SymbolManager_->GetSourceLocationByAddress(Address.Value);
 
     if (!Location.HasValue())
     {
@@ -2089,7 +2089,7 @@ CommandProcessor::ExecuteSourceLine(
 
     std::wprintf(
         L"%s\n",
-        Formatter->FormatAddressInline(Address.Value).c_str());
+        Formatter_->FormatAddressInline(Address.Value).c_str());
 
     if (Location.Value.Column != 0)
     {
@@ -2139,12 +2139,12 @@ CommandProcessor::ExecuteSymbolSearch(
     bool Truncated = false;
 
     const auto Modules =
-        ModuleManager->EnumerateModules();
+        ModuleManager_->EnumerateModules();
 
     for (const auto& Module : Modules)
     {
         auto Symbols =
-            SymbolManager->EnumerateSymbols(Module.Id);
+            SymbolManager_->EnumerateSymbols(Module.Id);
 
         if (!Symbols.HasValue())
         {
@@ -2236,7 +2236,7 @@ CommandProcessor::ExecuteStackTrace(
         return false;
     }
 
-    if (!StackWalker)
+    if (!StackWalker_)
     {
         std::wprintf(L"No stack walker is available.\n");
         return false;
@@ -2247,8 +2247,8 @@ CommandProcessor::ExecuteStackTrace(
     if (Arguments.size() == 2)
     {
         auto MaxFrames = EvaluateSimpleExpression(
-            *Session,
-            CurrentCpuId,
+            *Session_,
+            CurrentCpuId_,
             Arguments[1],
             nullptr);
 
@@ -2267,9 +2267,9 @@ CommandProcessor::ExecuteStackTrace(
             static_cast<VSGDBCore::U32>(MaxFrames.Value);
     }
 
-    auto Frames = StackWalker->WalkStack(
-        *Session,
-        CurrentCpuId,
+    auto Frames = StackWalker_->WalkStack(
+        *Session_,
+        CurrentCpuId_,
         Options);
 
     if (!Frames.HasValue())
@@ -2288,7 +2288,7 @@ CommandProcessor::ExecuteStackTrace(
             std::wprintf(
                 L"#%-2u  %s\n",
                 Frame.Index,
-                Formatter->FormatAddressInline(
+                Formatter_->FormatAddressInline(
                     Frame.InstructionPointer).c_str());
         }
         else
@@ -2297,13 +2297,13 @@ CommandProcessor::ExecuteStackTrace(
                 L"#%-2u  RIP=%s  RBP=0x%016llx  RSP=0x%016llx  "
                 L"Establisher=0x%016llx  RetSlot=0x%016llx  RET=%s\n",
                 Frame.Index,
-                Formatter->FormatAddressInline(
+                Formatter_->FormatAddressInline(
                     Frame.InstructionPointer).c_str(),
                 Frame.FramePointer,
                 Frame.StackPointer,
                 Frame.EstablisherFrame,
                 Frame.ReturnAddressLocation,
-                Formatter->FormatAddressInline(
+                Formatter_->FormatAddressInline(
                     Frame.ReturnAddress).c_str());
         }
     }

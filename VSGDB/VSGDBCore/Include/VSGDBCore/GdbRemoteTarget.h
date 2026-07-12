@@ -138,18 +138,18 @@ namespace VSGDBCore
             U32 Size);
 
     private:
-        GdbRemoteConnection Connection;
-        DebugTargetConfig Config{};
+        GdbRemoteConnection Connection_;
+        DebugTargetConfig Config_{};
 
-        DebugEvent LastEvent{};
-        bool HasLastEvent = false;
+        DebugEvent LastEvent_{};
+        bool HasLastEvent_ = false;
 
-        BreakpointId NextBreakpointId = 1;
-        std::unordered_map<BreakpointId, BreakpointInfo> Breakpoints;
+        BreakpointId NextBreakpointId_ = 1;
+        std::unordered_map<BreakpointId, BreakpointInfo> Breakpoints_;
 
-        std::vector<DebugThreadInfo> Threads;
+        std::vector<DebugThreadInfo> Threads_;
 
-        RegisterDescriptorSet RegisterDescriptors{};
-        bool RegisterDescriptorsLoaded = false;
+        RegisterDescriptorSet RegisterDescriptors_{};
+        bool RegisterDescriptorsLoaded_ = false;
     };
 }

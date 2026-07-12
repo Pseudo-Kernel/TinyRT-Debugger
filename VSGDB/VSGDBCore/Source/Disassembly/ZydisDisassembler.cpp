@@ -185,7 +185,7 @@ namespace VSGDBCore
     ProcessorArchitecture
         ZydisDisassembler::GetArchitecture() const
     {
-        return Architecture;
+        return Architecture_;
     }
 
     DebugError
@@ -200,7 +200,7 @@ namespace VSGDBCore
         }
 
         ZyanStatus Status = ZydisDecoderInit(
-            &Decoder,
+            &Decoder_,
             ZYDIS_MACHINE_MODE_LONG_64,
             ZYDIS_STACK_WIDTH_64);
 
@@ -212,7 +212,7 @@ namespace VSGDBCore
         }
 
         Status = ZydisFormatterInit(
-            &Formatter,
+            &Formatter_,
             ZYDIS_FORMATTER_STYLE_INTEL);
 
         if (!ZYAN_SUCCESS(Status))
@@ -222,7 +222,7 @@ namespace VSGDBCore
                 L"ZydisFormatterInit failed.");
         }
 
-        Architecture = NewArchitecture;
+        Architecture_ = NewArchitecture;
         return DebugError::Success();
     }
 
@@ -251,7 +251,7 @@ namespace VSGDBCore
 
             const ZyanStatus DecodeStatus =
                 ZydisDecoderDecodeFull(
-                    &Decoder,
+                    &Decoder_,
                     Bytes.data() + Offset,
                     Bytes.size() - Offset,
                     &DecodedInstruction,
@@ -305,7 +305,7 @@ namespace VSGDBCore
 
             const ZyanStatus FormatStatus =
                 ZydisFormatterFormatInstruction(
-                    &Formatter,
+                    &Formatter_,
                     &DecodedInstruction,
                     DecodedOperands,
                     DecodedInstruction.operand_count_visible,

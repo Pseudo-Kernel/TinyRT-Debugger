@@ -37,7 +37,7 @@ namespace VSGDBCore
             const std::wstring& Left,
             const std::wstring& Right);
 
-        std::vector<ModuleInfo> Modules;
-        ModuleId NextModuleId = 1;
+        std::vector<ModuleInfo> Modules_;
+        ModuleId NextModuleId_ = 1;
     };
 }

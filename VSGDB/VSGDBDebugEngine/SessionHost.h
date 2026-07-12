@@ -22,5 +22,5 @@ public:
     VSGDBCore::IDebugSession* GetSession();
 
 private:
-    std::unique_ptr<VSGDBCore::IDebugSession> Session;
+    std::unique_ptr<VSGDBCore::IDebugSession> Session_;
 };

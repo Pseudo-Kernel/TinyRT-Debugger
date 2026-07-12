@@ -96,9 +96,9 @@ namespace VSGDBCore
         GdbRemoteTarget::Connect(
             const DebugTargetConfig& TargetConfig)
     {
-        Config = TargetConfig;
+        Config_ = TargetConfig;
 
-        return Connection.Connect(
+        return Connection_.Connect(
             TargetConfig.Host,
             TargetConfig.Port);
     }
@@ -106,13 +106,13 @@ namespace VSGDBCore
     DebugError
         GdbRemoteTarget::Disconnect()
     {
-        return Connection.Disconnect();
+        return Connection_.Disconnect();
     }
 
     DebugError
         GdbRemoteTarget::Break()
     {
-        DebugError Error = Connection.SendInterrupt();
+        DebugError Error = Connection_.SendInterrupt();
         if (!Error.IsSuccess())
         {
             return Error;
@@ -137,7 +137,7 @@ namespace VSGDBCore
             return SelectError;
         }
 
-        auto Reply = Connection.SendCommand("c");
+        auto Reply = Connection_.SendCommand("c");
 
         if (!Reply.HasValue())
         {
@@ -150,8 +150,8 @@ namespace VSGDBCore
             return Event.Error;
         }
 
-        LastEvent = Event.Value;
-        HasLastEvent = true;
+        LastEvent_ = Event.Value;
+        HasLastEvent_ = true;
 
         return DebugError::Success();
     }
@@ -165,7 +165,7 @@ namespace VSGDBCore
             return SelectError;
         }
 
-        auto Reply = Connection.SendCommand("c");
+        auto Reply = Connection_.SendCommand("c");
 
         if (!Reply.HasValue())
         {
@@ -178,8 +178,8 @@ namespace VSGDBCore
             return Event.Error;
         }
 
-        LastEvent = Event.Value;
-        HasLastEvent = true;
+        LastEvent_ = Event.Value;
+        HasLastEvent_ = true;
 
         return DebugError::Success();
     }
@@ -200,7 +200,7 @@ namespace VSGDBCore
             return SelectError;
         }
 
-        auto Reply = Connection.SendCommand("s");
+        auto Reply = Connection_.SendCommand("s");
 
         if (!Reply.HasValue())
         {
@@ -213,8 +213,8 @@ namespace VSGDBCore
             return Event.Error;
         }
 
-        LastEvent = Event.Value;
-        HasLastEvent = true;
+        LastEvent_ = Event.Value;
+        HasLastEvent_ = true;
 
         return DebugError::Success();
     }
@@ -225,13 +225,13 @@ namespace VSGDBCore
     {
         (void)TimeoutMilliseconds;
 
-        if (HasLastEvent)
+        if (HasLastEvent_)
         {
-            HasLastEvent = false;
-            return Expected<DebugEvent>::Success(LastEvent);
+            HasLastEvent_ = false;
+            return Expected<DebugEvent>::Success(LastEvent_);
         }
 
-        auto Reply = Connection.SendCommand("?");
+        auto Reply = Connection_.SendCommand("?");
 
         if (!Reply.HasValue())
         {
@@ -257,7 +257,7 @@ namespace VSGDBCore
             return Expected<RegisterContext>::Failure(SelectError);
         }
 
-        auto Reply = Connection.SendCommand("g");
+        auto Reply = Connection_.SendCommand("g");
 
         if (!Reply.HasValue())
         {
@@ -414,7 +414,7 @@ namespace VSGDBCore
         std::string Command = Prefix;
         Command += HexBytes;
 
-        auto Reply = Connection.SendCommand(Command);
+        auto Reply = Connection_.SendCommand(Command);
 
         if (!Reply.HasValue())
         {
@@ -490,7 +490,7 @@ namespace VSGDBCore
             return Expected<BreakpointInfo>::Failure(Error);
         }
 
-        const BreakpointId Id = NextBreakpointId++;
+        const BreakpointId Id = NextBreakpointId_++;
 
         BreakpointInfo Info{};
         Info.Id = Id;
@@ -500,7 +500,7 @@ namespace VSGDBCore
         Info.Enabled = true;
         Info.Inserted = true;
 
-        Breakpoints.emplace(Id, Info);
+        Breakpoints_.emplace(Id, Info);
 
         return Expected<BreakpointInfo>::Success(Info);
     }
@@ -509,8 +509,8 @@ namespace VSGDBCore
         GdbRemoteTarget::DeleteBreakpoint(
             BreakpointId Id)
     {
-        auto It = Breakpoints.find(Id);
-        if (It == Breakpoints.end())
+        auto It = Breakpoints_.find(Id);
+        if (It == Breakpoints_.end())
         {
             return DebugError::Failure(
                 ErrorCode::BreakpointFailure,
@@ -550,9 +550,9 @@ namespace VSGDBCore
     {
         std::vector<BreakpointInfo> Result;
 
-        Result.reserve(Breakpoints.size());
+        Result.reserve(Breakpoints_.size());
 
-        for (const auto& Pair : Breakpoints)
+        for (const auto& Pair : Breakpoints_)
         {
             const BreakpointInfo& Breakpoint = Pair.second;
 
@@ -574,7 +574,7 @@ namespace VSGDBCore
             U64 Address,
             U32 Size)
     {
-        for (auto& Pair : Breakpoints)
+        for (auto& Pair : Breakpoints_)
         {
             BreakpointInfo& Breakpoint = Pair.second;
 
@@ -624,7 +624,7 @@ namespace VSGDBCore
             Address,
             Size);
 
-        auto Reply = Connection.SendCommand(Packet);
+        auto Reply = Connection_.SendCommand(Packet);
         if (!Reply.HasValue())
         {
             return Reply.Error;
@@ -669,7 +669,7 @@ namespace VSGDBCore
             Address,
             Size);
 
-        auto Reply = Connection.SendCommand(Packet);
+        auto Reply = Connection_.SendCommand(Packet);
         if (!Reply.HasValue())
         {
             return Reply.Error;
@@ -696,8 +696,8 @@ namespace VSGDBCore
         GdbRemoteTarget::DisableBreakpointInTarget(
             BreakpointId Id)
     {
-        auto It = Breakpoints.find(Id);
-        if (It == Breakpoints.end())
+        auto It = Breakpoints_.find(Id);
+        if (It == Breakpoints_.end())
         {
             return DebugError::Failure(
                 ErrorCode::BreakpointFailure,
@@ -736,8 +736,8 @@ namespace VSGDBCore
         GdbRemoteTarget::EnableBreakpointInTarget(
             BreakpointId Id)
     {
-        auto It = Breakpoints.find(Id);
-        if (It == Breakpoints.end())
+        auto It = Breakpoints_.find(Id);
+        if (It == Breakpoints_.end())
         {
             return DebugError::Failure(
                 ErrorCode::BreakpointFailure,
@@ -777,7 +777,7 @@ namespace VSGDBCore
     {
         DebugError FirstError = DebugError::Success();
 
-        for (auto& Pair : Breakpoints)
+        for (auto& Pair : Breakpoints_)
         {
             BreakpointInfo& Breakpoint = Pair.second;
 
@@ -867,7 +867,7 @@ namespace VSGDBCore
         std::string Command = "Hg";
         Command += ThreadId;
 
-        auto Reply = Connection.SendCommand(Command);
+        auto Reply = Connection_.SendCommand(Command);
         if (!Reply.HasValue())
         {
             return Reply.Error;
@@ -890,7 +890,7 @@ namespace VSGDBCore
         std::string Command = "Hc";
         Command += ThreadId;
 
-        auto Reply = Connection.SendCommand(Command);
+        auto Reply = Connection_.SendCommand(Command);
         if (!Reply.HasValue())
         {
             return Reply.Error;
@@ -909,7 +909,7 @@ namespace VSGDBCore
     Expected<DebugEvent>
         GdbRemoteTarget::GetLastEvent() const
     {
-        if (!HasLastEvent)
+        if (!HasLastEvent_)
         {
             return Expected<DebugEvent>::Failure(
                 DebugError::Failure(
@@ -917,13 +917,13 @@ namespace VSGDBCore
                     L"No stop event is available."));
         }
 
-        return Expected<DebugEvent>::Success(LastEvent);
+        return Expected<DebugEvent>::Success(LastEvent_);
     }
 
     DebugError
         GdbRemoteTarget::BreakExecution()
     {
-        return Connection.SendInterrupt();
+        return Connection_.SendInterrupt();
     }
 
     Expected<std::vector<DebugThreadInfo>>
@@ -935,7 +935,7 @@ namespace VSGDBCore
 
         for (;;)
         {
-            auto Reply = Connection.SendCommand(
+            auto Reply = Connection_.SendCommand(
                 First ? "qfThreadInfo" : "qsThreadInfo");
 
             if (!Reply.HasValue())
@@ -1004,7 +1004,7 @@ namespace VSGDBCore
         GdbRemoteTarget::GetRemoteThreadIdFromCpuId(
             U32 CpuId)
     {
-        if (Threads.empty())
+        if (Threads_.empty())
         {
             auto ThreadResult = EnumerateThreads();
             if (!ThreadResult.HasValue())
@@ -1012,10 +1012,10 @@ namespace VSGDBCore
                 return Expected<std::string>::Failure(ThreadResult.Error);
             }
 
-            Threads = ThreadResult.Value;
+            Threads_ = ThreadResult.Value;
         }
 
-        for (const DebugThreadInfo& Thread : Threads)
+        for (const DebugThreadInfo& Thread : Threads_)
         {
             if (Thread.CpuId == CpuId)
             {
@@ -1047,7 +1047,7 @@ namespace VSGDBCore
                 Offset,
                 ChunkSize);
 
-            auto Reply = Connection.SendCommand(Command);
+            auto Reply = Connection_.SendCommand(Command);
             if (!Reply.HasValue())
             {
                 return Expected<std::string>::Failure(Reply.Error);
@@ -1096,7 +1096,7 @@ namespace VSGDBCore
         }
 
         const RegisterDescriptor* Descriptor =
-            FindRegisterDescriptor(RegisterDescriptors, Name);
+            FindRegisterDescriptor(RegisterDescriptors_, Name);
 
         if (!Descriptor)
         {
@@ -1125,7 +1125,7 @@ namespace VSGDBCore
             "p%x",
             Descriptor->Number);
 
-        auto Reply = Connection.SendCommand(Command);
+        auto Reply = Connection_.SendCommand(Command);
         if (!Reply.HasValue())
         {
             return Expected<U64>::Failure(Reply.Error);
@@ -1164,7 +1164,7 @@ namespace VSGDBCore
                 Offset,
                 ChunkSize);
 
-            auto Reply = Connection.SendCommand(Command);
+            auto Reply = Connection_.SendCommand(Command);
             if (!Reply.HasValue())
             {
                 return Expected<std::string>::Failure(Reply.Error);
@@ -1271,7 +1271,7 @@ namespace VSGDBCore
     DebugError
         GdbRemoteTarget::EnsureTargetDescriptionLoaded()
     {
-        if (RegisterDescriptorsLoaded)
+        if (RegisterDescriptorsLoaded_)
         {
             return DebugError::Success();
         }
@@ -1294,8 +1294,8 @@ namespace VSGDBCore
                 L"No registers were found in GDB target description.");
         }
 
-        RegisterDescriptors = Description.Value;
-        RegisterDescriptorsLoaded = true;
+        RegisterDescriptors_ = Description.Value;
+        RegisterDescriptorsLoaded_ = true;
 
         return DebugError::Success();
     }
@@ -1304,7 +1304,7 @@ namespace VSGDBCore
         GdbRemoteTarget::SetQemuPhysicalMemoryMode(
             bool Enabled)
     {
-        auto Reply = Connection.SendCommand(
+        auto Reply = Connection_.SendCommand(
             Enabled ? "Qqemu.PhyMemMode:1" : "Qqemu.PhyMemMode:0");
 
         if (!Reply.HasValue())
@@ -1354,7 +1354,7 @@ namespace VSGDBCore
             Address,
             Size);
 
-        auto Reply = Connection.SendCommand(Command);
+        auto Reply = Connection_.SendCommand(Command);
 
         if (!Reply.HasValue())
         {

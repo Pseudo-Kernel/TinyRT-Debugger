@@ -41,8 +41,8 @@ namespace VSGDBCore
         Expected<std::string> ReceivePacket();
 
     private:
-        uintptr_t SocketValue = static_cast<uintptr_t>(~0ull);
-        bool WinsockInitialized = false;
-        bool Connected = false;
+        uintptr_t SocketValue_ = static_cast<uintptr_t>(~0ull);
+        bool WinsockInitialized_ = false;
+        bool Connected_ = false;
     };
 }

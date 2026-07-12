@@ -65,6 +65,6 @@ private:
     AddressLabel FormatAddressWithModule(
         VSGDBCore::U64 Address) const;
 
-    const VSGDBCore::IModuleManager* ModuleManager = nullptr;
-    const VSGDBCore::ISymbolManager* SymbolManager = nullptr;
+    const VSGDBCore::IModuleManager* ModuleManager_ = nullptr;
+    const VSGDBCore::ISymbolManager* SymbolManager_ = nullptr;
 };

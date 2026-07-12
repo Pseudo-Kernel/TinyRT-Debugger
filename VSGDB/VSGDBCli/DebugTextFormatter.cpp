@@ -66,8 +66,8 @@ PrintPageEntry(
 DebugTextFormatter::DebugTextFormatter(
     const VSGDBCore::IModuleManager* ModuleManager, 
     const VSGDBCore::ISymbolManager* SymbolManager) :
-    ModuleManager(ModuleManager),
-    SymbolManager(SymbolManager)
+    ModuleManager_(ModuleManager),
+    SymbolManager_(SymbolManager)
 {
 }
 
@@ -441,12 +441,12 @@ DebugTextFormatter::FormatAddressWithSymbol(
 {
     AddressLabel Label{};
 
-    if (SymbolManager == nullptr)
+    if (SymbolManager_ == nullptr)
     {
         return Label;
     }
 
-    auto Symbol = SymbolManager->GetSymbolByAddress(Address);
+    auto Symbol = SymbolManager_->GetSymbolByAddress(Address);
 
     if (!Symbol.HasValue())
     {
@@ -496,12 +496,12 @@ DebugTextFormatter::FormatAddressWithModule(
 {
     AddressLabel Label{};
 
-    if (ModuleManager == nullptr)
+    if (ModuleManager_ == nullptr)
     {
         return Label;
     }
 
-    auto Module = ModuleManager->GetModuleByAddress(Address);
+    auto Module = ModuleManager_->GetModuleByAddress(Address);
 
     if (!Module.HasValue())
     {

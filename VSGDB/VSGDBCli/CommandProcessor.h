@@ -151,21 +151,19 @@ private:
         bool Verbose);
 
 private:
-    std::unique_ptr<VSGDBCore::IDebugSession> Session;
-    VSGDBCore::U32 CurrentCpuId = 0;
-    bool QuitRequested = false;
+    std::unique_ptr<VSGDBCore::IDebugSession> Session_;
+    VSGDBCore::U32 CurrentCpuId_ = 0;
+    bool QuitRequested_ = false;
 
-//    std::vector<CliBreakpoint> Breakpoints;
+    std::atomic<bool> TargetRunning_ = false;
+    std::atomic<bool> BreakRequested_ = false;
 
-    std::atomic<bool> TargetRunning = false;
-    std::atomic<bool> BreakRequested = false;
+    std::unique_ptr<VSGDBCore::IDisassembler> Disassembler_;
+    std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager_;
+    std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager_;
+    std::unique_ptr<VSGDBCore::IStackWalker> StackWalker_;
 
-    std::unique_ptr<VSGDBCore::IDisassembler> Disassembler;
-    std::unique_ptr<VSGDBCore::IModuleManager> ModuleManager;
-    std::unique_ptr<VSGDBCore::ISymbolManager> SymbolManager;
-    std::unique_ptr<VSGDBCore::IStackWalker> StackWalker;
+    std::unique_ptr<DebugTextFormatter> Formatter_;
 
-    std::unique_ptr<DebugTextFormatter> Formatter;
-
-    VSGDBCore::U32 ScriptDepth = 0;
+    VSGDBCore::U32 ScriptDepth_ = 0;
 };

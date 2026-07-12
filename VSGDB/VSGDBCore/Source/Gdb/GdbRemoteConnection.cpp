@@ -93,7 +93,7 @@ namespace VSGDBCore
     DebugError
         GdbRemoteConnection::InitializeWinsock()
     {
-        if (WinsockInitialized)
+        if (WinsockInitialized_)
         {
             return DebugError::Success();
         }
@@ -111,7 +111,7 @@ namespace VSGDBCore
                 static_cast<U32>(Result));
         }
 
-        WinsockInitialized = true;
+        WinsockInitialized_ = true;
         return DebugError::Success();
     }
 
@@ -120,7 +120,7 @@ namespace VSGDBCore
             const std::wstring& Host,
             U16 Port)
     {
-        if (Connected)
+        if (Connected_)
         {
             return DebugError::Success();
         }
@@ -205,8 +205,8 @@ namespace VSGDBCore
                 L"Failed to connect to GDB remote target.");
         }
 
-        SocketValue = FromSocket(ConnectedSocket);
-        Connected = true;
+        SocketValue_ = FromSocket(ConnectedSocket);
+        Connected_ = true;
 
         return DebugError::Success();
     }
@@ -214,22 +214,22 @@ namespace VSGDBCore
     DebugError
         GdbRemoteConnection::Disconnect()
     {
-        if (Connected)
+        if (Connected_)
         {
             shutdown(
-                ToSocket(SocketValue),
+                ToSocket(SocketValue_),
                 SD_BOTH);
 
-            closesocket(ToSocket(SocketValue));
+            closesocket(ToSocket(SocketValue_));
 
-            SocketValue = FromSocket(INVALID_SOCKET);
-            Connected = false;
+            SocketValue_ = FromSocket(INVALID_SOCKET);
+            Connected_ = false;
         }
 
-        if (WinsockInitialized)
+        if (WinsockInitialized_)
         {
             WSACleanup();
-            WinsockInitialized = false;
+            WinsockInitialized_ = false;
         }
 
         return DebugError::Success();
@@ -238,7 +238,7 @@ namespace VSGDBCore
     bool
         GdbRemoteConnection::IsConnected() const
     {
-        return Connected;
+        return Connected_;
     }
 
     DebugError
@@ -253,7 +253,7 @@ namespace VSGDBCore
             const int Remaining = static_cast<int>(Size - SentTotal);
 
             const int Sent = send(
-                ToSocket(SocketValue),
+                ToSocket(SocketValue_),
                 Buffer + SentTotal,
                 Remaining,
                 0);
@@ -284,7 +284,7 @@ namespace VSGDBCore
         char Character = 0;
 
         const int Received = recv(
-            ToSocket(SocketValue),
+            ToSocket(SocketValue_),
             &Character,
             1,
             0);
@@ -400,7 +400,7 @@ namespace VSGDBCore
         GdbRemoteConnection::SendCommand(
             const std::string& Payload)
     {
-        if (!Connected)
+        if (!Connected_)
         {
             return Expected<std::string>::Failure(
                 DebugError::Failure(
@@ -447,7 +447,7 @@ namespace VSGDBCore
     DebugError
         GdbRemoteConnection::SendInterrupt()
     {
-        if (!Connected)
+        if (!Connected_)
         {
             return DebugError::Failure(
                 ErrorCode::NotConnected,
@@ -461,7 +461,7 @@ namespace VSGDBCore
     Expected<std::string>
         GdbRemoteConnection::ReceiveResponsePacket()
     {
-        if (!Connected)
+        if (!Connected_)
         {
             return Expected<std::string>::Failure(
                 DebugError::Failure(

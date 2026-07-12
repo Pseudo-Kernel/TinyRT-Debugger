@@ -6,7 +6,7 @@
 #include <VSGDBCore/Components.h>
 
 SessionHost::SessionHost()
-    : Session(VSGDBCore::CreateDefaultDebugSession())
+    : Session_(VSGDBCore::CreateDefaultDebugSession())
 {
     VsgdbLog(__FUNCTIONW__);
 }
@@ -27,7 +27,7 @@ SessionHost::Connect(
     Options.Host = Host;
     Options.Port = Port;
 
-    return Session->Connect(Options);
+    return Session_->Connect(Options);
 }
 
 VSGDBCore::DebugError
@@ -35,11 +35,11 @@ SessionHost::Disconnect()
 {
     VsgdbLog(__FUNCTIONW__);
 
-    return Session->Disconnect();
+    return Session_->Disconnect();
 }
 
 VSGDBCore::IDebugSession*
 SessionHost::GetSession()
 {
-    return Session.get();
+    return Session_.get();
 }

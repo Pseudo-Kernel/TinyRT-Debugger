@@ -81,10 +81,10 @@ namespace VSGDBCore
         mutable std::mutex Lock;
         DebugSessionState State = DebugSessionState::Disconnected;
 
-        std::unique_ptr<IDebugTarget> Target;
-        std::unique_ptr<IDisassembler> Disassembler;
-        std::unique_ptr<IModuleManager> ModuleManager;
-        std::unique_ptr<ISymbolManager> SymbolManager;
-        std::unique_ptr<IStackWalker> StackWalker;
+        std::unique_ptr<IDebugTarget> Target_;
+        std::unique_ptr<IDisassembler> Disassembler_;
+        std::unique_ptr<IModuleManager> ModuleManager_;
+        std::unique_ptr<ISymbolManager> SymbolManager_;
+        std::unique_ptr<IStackWalker> StackWalker_;
     };
 }

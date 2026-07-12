@@ -22,10 +22,10 @@ namespace VSGDBCore
             U32 MaxInstructionCount) override;
 
     private:
-        ProcessorArchitecture Architecture =
+        ProcessorArchitecture Architecture_ =
             ProcessorArchitecture::Unknown;
 
-        ZydisDecoder Decoder{};
-        ZydisFormatter Formatter{};
+        ZydisDecoder Decoder_{};
+        ZydisFormatter Formatter_{};
     };
 }

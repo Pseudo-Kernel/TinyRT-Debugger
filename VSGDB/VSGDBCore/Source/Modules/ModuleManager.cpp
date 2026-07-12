@@ -84,7 +84,7 @@ namespace VSGDBCore
                         L"Module address range overflows."));
             }
 
-            for (const ModuleInfo& ExistingModule : Modules)
+            for (const ModuleInfo& ExistingModule : Modules_)
             {
                 if (ExistingModule.Size == 0)
                 {
@@ -108,7 +108,7 @@ namespace VSGDBCore
             }
         }
 
-        if (NextModuleId == 0)
+        if (NextModuleId_ == 0)
         {
             return Expected<ModuleId>::Failure(
                 DebugError::Failure(
@@ -116,12 +116,12 @@ namespace VSGDBCore
                     L"Module ID space exhausted."));
         }
 
-        const ModuleId Id = NextModuleId++;
+        const ModuleId Id = NextModuleId_++;
 
         ModuleInfo StoredModule = Module;
         StoredModule.Id = Id;
 
-        Modules.push_back(std::move(StoredModule));
+        Modules_.push_back(std::move(StoredModule));
 
         return Expected<ModuleId>::Success(Id);
     }
@@ -132,21 +132,21 @@ namespace VSGDBCore
     {
         const auto Iterator =
             std::find_if(
-                Modules.begin(),
-                Modules.end(),
+                Modules_.begin(),
+                Modules_.end(),
                 [Id](const ModuleInfo& Module)
                 {
                     return Module.Id == Id;
                 });
 
-        if (Iterator == Modules.end())
+        if (Iterator == Modules_.end())
         {
             return DebugError::Failure(
                 ErrorCode::InvalidArgument,
                 L"Module ID was not found.");
         }
 
-        Modules.erase(Iterator);
+        Modules_.erase(Iterator);
 
         return DebugError::Success();
     }
@@ -155,7 +155,7 @@ namespace VSGDBCore
         ModuleManager::GetModuleById(
             ModuleId Id) const
     {
-        for (const ModuleInfo& Module : Modules)
+        for (const ModuleInfo& Module : Modules_)
         {
             if (Module.Id == Id)
             {
@@ -173,7 +173,7 @@ namespace VSGDBCore
         ModuleManager::GetModuleByAddress(
             U64 Address) const
     {
-        for (const ModuleInfo& Module : Modules)
+        for (const ModuleInfo& Module : Modules_)
         {
             if (IsAddressInModule(Module, Address))
             {
@@ -191,7 +191,7 @@ namespace VSGDBCore
         ModuleManager::GetModuleByName(
             const std::wstring& Name) const
     {
-        for (const ModuleInfo& Module : Modules)
+        for (const ModuleInfo& Module : Modules_)
         {
             if (AreNamesEqual(Module.Name, Name))
             {
@@ -208,13 +208,13 @@ namespace VSGDBCore
     std::vector<ModuleInfo>
         ModuleManager::EnumerateModules() const
     {
-        return Modules;
+        return Modules_;
     }
 
     void
         ModuleManager::Clear()
     {
-        Modules.clear();
-        NextModuleId = 1;
+        Modules_.clear();
+        NextModuleId_ = 1;
     }
 }

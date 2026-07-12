@@ -5,7 +5,7 @@
 #include "VSGDBDebugEngineGuids.h"
 
 DebugEngine::DebugEngine()
-    : ReferenceCount(1)
+    : ReferenceCount_(1)
 {
     VsgdbLog(L"DebugEngine created");
 }
@@ -36,7 +36,7 @@ DebugEngine::QueryInterface(
 ULONG STDMETHODCALLTYPE
 DebugEngine::AddRef()
 {
-    return ReferenceCount.fetch_add(
+    return ReferenceCount_.fetch_add(
         1,
         std::memory_order_relaxed) + 1;
 }
@@ -45,7 +45,7 @@ ULONG STDMETHODCALLTYPE
 DebugEngine::Release()
 {
     ULONG NewReferenceCount =
-        ReferenceCount.fetch_sub(
+        ReferenceCount_.fetch_sub(
             1,
             std::memory_order_acq_rel) - 1;
 

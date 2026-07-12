@@ -66,5 +66,5 @@ public:
     HRESULT STDMETHODCALLTYPE CauseBreak() override;
 
 private:
-    std::atomic<ULONG> ReferenceCount = 1;
+    std::atomic<ULONG> ReferenceCount_ = 1;
 };

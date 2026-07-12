@@ -18,9 +18,9 @@ public:
     ComPtr& operator=(const ComPtr&) = delete;
 
     ComPtr(ComPtr&& Other) noexcept
-        : Pointer(Other.Pointer)
+        : Pointer_(Other.Pointer_)
     {
-        Other.Pointer = nullptr;
+        Other.Pointer_ = nullptr;
     }
 
     ComPtr& operator=(ComPtr&& Other) noexcept
@@ -28,8 +28,8 @@ public:
         if (this != &Other)
         {
             Reset();
-            Pointer = Other.Pointer;
-            Other.Pointer = nullptr;
+            Pointer_ = Other.Pointer_;
+            Other.Pointer_ = nullptr;
         }
 
         return *this;
@@ -37,7 +37,7 @@ public:
 
     operator T*() const
     {
-        return Pointer;
+        return Pointer_;
     }
 
     ~ComPtr()
@@ -47,31 +47,31 @@ public:
 
     T* Get() const
     {
-        return Pointer;
+        return Pointer_;
     }
 
     T** Put()
     {
         Reset();
-        return &Pointer;
+        return &Pointer_;
     }
 
     T* operator->() const
     {
-        return Pointer;
+        return Pointer_;
     }
 
     void Reset()
     {
-        if (Pointer != nullptr)
+        if (Pointer_ != nullptr)
         {
-            Pointer->Release();
-            Pointer = nullptr;
+            Pointer_->Release();
+            Pointer_ = nullptr;
         }
     }
 
 private:
-    T* Pointer = nullptr;
+    T* Pointer_ = nullptr;
 };
 
 namespace VSGDBCore
@@ -143,6 +143,6 @@ namespace VSGDBCore
                 enum SymTagEnum NativeTag) const;
 
 
-        std::vector<LoadedModule> LoadedModules;
+        std::vector<LoadedModule> LoadedModules_;
     };
 }
