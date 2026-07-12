@@ -29,6 +29,9 @@ namespace VSGDBVsix
         "VSGDB Debugger Integration",
         "0.1")]
     [ProvideMenuResource("Menus.ctmenu", 1)]
+    [ProvideAutoLoad( // For temporary workaround
+        Microsoft.VisualStudio.Shell.Interop.UIContextGuids80.NoSolution,
+        PackageAutoLoadFlags.BackgroundLoad)]
     [Guid(VSGDBVsixPackage.PackageGuidString)]
     public sealed class VSGDBVsixPackage : AsyncPackage
     {
@@ -52,7 +55,9 @@ namespace VSGDBVsix
             // Do any initialization that requires the UI thread after switching to the UI thread.
             await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
-            await LoadDebugEngineCommand.InitializeAsync(this);
+            System.Diagnostics.Debug.WriteLine(
+                "[VSGDBVsix] Package InitializeAsync");
+
             await LoadDebugEngineCommand.InitializeAsync(this);
         }
 

@@ -1,54 +1,40 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable">
 
-    <Extern href="stdidcmd.h"/>
-    <Extern href="vsshlids.h"/>
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
 
-    <Commands package="guidVSGDBPackage">
-        <Menus>
-            <Menu guid="guidVSGDBCommandSet"
-                  id="VSGDBMenu"
-                  priority="0x700"
-                  type="Menu">
-                <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
-                <Strings>
-                    <ButtonText>VSGDB</ButtonText>
-                    <CommandName>VSGDB</CommandName>
-                </Strings>
-            </Menu>
-        </Menus>
+  <Commands package="guidVSGDBPackage">
+    <Groups>
+      <Group guid="guidVSGDBCommandSet"
+             id="VSGDBGroup"
+             priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
+      </Group>
+    </Groups>
 
-        <Groups>
-            <Group guid="guidVSGDBCommandSet"
-                   id="VSGDBGroup"
-                   priority="0x0600">
-                <Parent guid="guidVSGDBCommandSet" id="VSGDBMenu"/>
-            </Group>
-        </Groups>
+    <Buttons>
+      <Button guid="guidVSGDBCommandSet"
+              id="LoadDebugEngineCommandId"
+              priority="0x0100"
+              type="Button">
+        <Parent guid="guidVSGDBCommandSet" id="VSGDBGroup"/>
+        <Strings>
+          <ButtonText>Load VSGDB Debug Engine</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
 
-        <Buttons>
-            <Button guid="guidVSGDBCommandSet"
-                    id="LoadDebugEngineCommandId"
-                    priority="0x0100"
-                    type="Button">
-                <Parent guid="guidVSGDBCommandSet" id="VSGDBGroup"/>
-                <Strings>
-                    <ButtonText>Load Debug Engine</ButtonText>
-                </Strings>
-            </Button>
-        </Buttons>
-    </Commands>
+  <Symbols>
+    <GuidSymbol name="guidVSGDBPackage"
+                value="{6ad2801e-b6d6-417d-ac6c-93c35cefcd10}"/>
 
-    <Symbols>
-        <GuidSymbol name="guidVSGDBPackage"
-                    value="{6ad2801e-b6d6-417d-ac6c-93c35cefcd10}"/>
-
-        <GuidSymbol name="guidVSGDBCommandSet"
-                    value="{59f79947-34d9-41d9-90a3-2f2342317ee8}">
-            <IDSymbol name="VSGDBMenu" value="0x1000"/>
-            <IDSymbol name="VSGDBGroup" value="0x1020"/>
-            <IDSymbol name="LoadDebugEngineCommandId" value="0x0100"/>
-        </GuidSymbol>
-    </Symbols>
+    <GuidSymbol name="guidVSGDBCommandSet"
+                value="{59f79947-34d9-41d9-90a3-2f2342317ee8}">
+      <IDSymbol name="VSGDBGroup" value="0x1020"/>
+      <IDSymbol name="LoadDebugEngineCommandId" value="0x0100"/>
+    </GuidSymbol>
+  </Symbols>
 
 </CommandTable>

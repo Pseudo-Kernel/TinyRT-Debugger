@@ -71,11 +71,22 @@ namespace VSGDBVsix
         /// <param name="package">Owner package, not null.</param>
         public static async Task InitializeAsync(AsyncPackage package)
         {
+            System.Diagnostics.Debug.WriteLine(
+                "[VSGDBVsix] LoadDebugEngineCommand.InitializeAsync");
+
             // Switch to the main thread - the call to AddCommand in LoadDebugEngineCommand2's constructor requires
             // the UI thread.
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
             OleMenuCommandService commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService;
+
+            if (commandService == null)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[VSGDBVsix] OleMenuCommandService unavailable.");
+                return;
+            }
+
             Instance = new LoadDebugEngineCommand(package, commandService);
         }
 
@@ -90,27 +101,35 @@ namespace VSGDBVsix
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            try
+            ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
             {
-                NativeMethods.CoCreateVsgdbDebugEngine();
-                VsShellUtilities.ShowMessageBox(
-                    package,
-                    "VSGDBDebugEngine loaded successfully.",
-                    "VSGDB",
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_INFO,
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
-            }
-            catch (Exception ex)
-            {
-                VsShellUtilities.ShowMessageBox(
-                    package,
-                    ex.ToString(),
-                    "VSGDB load failed",
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGICON.OLEMSGICON_CRITICAL,
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                    Microsoft.VisualStudio.Shell.Interop.OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
-            }
+                try
+                {
+                    await NativeMethods.CreateVsgdbDebugEngineAsync(package);
+
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                    VsShellUtilities.ShowMessageBox(
+                        package,
+                        "VSGDBDebugEngine loaded successfully.",
+                        "VSGDB",
+                        OLEMSGICON.OLEMSGICON_INFO,
+                        OLEMSGBUTTON.OLEMSGBUTTON_OK,
+                        OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+                }
+                catch (Exception ex)
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                    VsShellUtilities.ShowMessageBox(
+                        package,
+                        ex.ToString(),
+                        "VSGDB load failed",
+                        OLEMSGICON.OLEMSGICON_CRITICAL,
+                        OLEMSGBUTTON.OLEMSGBUTTON_OK,
+                        OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+                }
+            }).FileAndForget("VSGDB/LoadDebugEngine");
         }
     }
 }
