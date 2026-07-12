@@ -2,10 +2,12 @@
 #define INITGUID
 
 #include "DebugEngine.h"
+#include "DebugProgramNode.h"
 #include "DebugEngineClassFactory.h"
 #include "VSGDBDebugEngineGuids.h"
 #include "SessionHost.h"
 #include "LogUtils.h"
+
 
 extern std::atomic<ULONG> g_DllObjectCount;
 extern std::atomic<ULONG> g_DllLockCount;
@@ -38,6 +40,67 @@ VsgdbDebugEngineSmokeTest(
     {
         return static_cast<int>(Error.Code);
     }
+
+    return 0;
+}
+
+extern "C" __declspec(dllexport)
+int
+VsgdbDebugProgramNodeSmokeTest()
+{
+    VsgdbLog(L"VsgdbDebugProgramNodeSmokeTest begin");
+
+    DebugProgramNode* Node = new DebugProgramNode();
+
+    BSTR ProgramName = nullptr;
+    HRESULT Hr = Node->GetProgramName(&ProgramName);
+    if (FAILED(Hr))
+    {
+        Node->Release();
+        return static_cast<int>(Hr);
+    }
+
+    if (ProgramName != nullptr)
+    {
+        VsgdbLogFormat(
+            L"ProgramName=%s",
+            ProgramName);
+
+        SysFreeString(ProgramName);
+    }
+
+    BSTR EngineName = nullptr;
+    GUID EngineGuid = {};
+    Hr = Node->GetEngineInfo(&EngineName, &EngineGuid);
+    if (FAILED(Hr))
+    {
+        Node->Release();
+        return static_cast<int>(Hr);
+    }
+
+    if (EngineName != nullptr)
+    {
+        VsgdbLogFormat(
+            L"EngineName=%s",
+            EngineName);
+
+        SysFreeString(EngineName);
+    }
+
+    if (EngineGuid == GUID_VSGDBDebugEngine)
+    {
+        VsgdbLog(L"EngineGuid matched GUID_VSGDBDebugEngine");
+    }
+    else
+    {
+        VsgdbLog(L"EngineGuid mismatch");
+        Node->Release();
+        return -1;
+    }
+
+    Node->Release();
+
+    VsgdbLog(L"VsgdbDebugProgramNodeSmokeTest end");
 
     return 0;
 }
