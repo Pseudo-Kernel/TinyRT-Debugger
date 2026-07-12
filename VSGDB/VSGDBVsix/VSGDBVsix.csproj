@@ -48,6 +48,7 @@
     <Compile Include="Helper.cs" />
     <Compile Include="LoadDebugEngineCommand.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StartDebugSessionCommand.cs" />
     <Compile Include="VSGDBVsixPackage.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -75,6 +76,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
+    <Content Include="Resources\StartDebugSessionCommand.png" />
     <Content Include="VSGDBDebugEngine.pkgdef">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>

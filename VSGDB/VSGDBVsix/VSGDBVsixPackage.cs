@@ -59,6 +59,7 @@ namespace VSGDBVsix
                 "[VSGDBVsix] Package InitializeAsync");
 
             await LoadDebugEngineCommand.InitializeAsync(this);
+            await StartDebugSessionCommand.InitializeAsync(this);
         }
 
         #endregion
