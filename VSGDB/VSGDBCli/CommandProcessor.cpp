@@ -4,8 +4,6 @@
 #include "ExpressionUtil.h"
 #include "RemoteThreadIdUtil.h"
 #include "MemoryPrinter.h"
-#include "PagingPrinter.h"
-#include "PageFaultPrinter.h"
 #include "SymbolQuery.h"
 #include "CommandScript.h"
 #include "PeImageUtil.h"

@@ -36,9 +36,6 @@
     <ClInclude Include="Include\VSGDBCore\IModuleManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\VSGDBCore\IOutputSink.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Include\VSGDBCore\ISymbolManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -58,12 +55,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\VSGDBCore\Types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\VSGDBCore\_DebugSessionConfig.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\VSGDBCore\_IDebugEventSink.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\VSGDBCore\NullComponents.h">

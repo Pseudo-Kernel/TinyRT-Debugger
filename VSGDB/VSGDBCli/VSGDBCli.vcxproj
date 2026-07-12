@@ -154,8 +154,6 @@
     <ClCompile Include="ExpressionUtil.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MemoryPrinter.cpp" />
-    <ClCompile Include="PageFaultPrinter.cpp" />
-    <ClCompile Include="PagingPrinter.cpp" />
     <ClCompile Include="PeImageUtil.cpp" />
     <ClCompile Include="RemoteThreadIdUtil.cpp" />
     <ClCompile Include="SymbolQuery.cpp" />
@@ -172,8 +170,6 @@
     <ClInclude Include="DisassemblyPrinter.h" />
     <ClInclude Include="ExpressionUtil.h" />
     <ClInclude Include="MemoryPrinter.h" />
-    <ClInclude Include="PageFaultPrinter.h" />
-    <ClInclude Include="PagingPrinter.h" />
     <ClInclude Include="PeImageUtil.h" />
     <ClInclude Include="RemoteThreadIdUtil.h" />
     <ClInclude Include="SymbolQuery.h" />

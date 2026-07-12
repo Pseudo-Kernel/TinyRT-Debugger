@@ -27,12 +27,6 @@
     <ClCompile Include="MemoryPrinter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PagingPrinter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="PageFaultPrinter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="RemoteThreadIdUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -60,12 +54,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MemoryPrinter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PagingPrinter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PageFaultPrinter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RemoteThreadIdUtil.h">
