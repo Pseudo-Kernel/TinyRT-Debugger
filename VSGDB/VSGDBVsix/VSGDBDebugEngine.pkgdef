@@ -4,3 +4,10 @@
 [$RootKey$\CLSID\{c8749761-deb7-44b1-55aa-5f5c9bdb7a11}\InprocServer32]
 @="$PackageFolder$\VSGDBDebugEngine.dll"
 "ThreadingModel"="Both"
+
+[$RootKey$\AD7Metrics\Engine\{9d760574-6f75-4c72-55aa-4b721e3c8c02}]
+"Name"="VSGDB Debug Engine"
+"CLSID"="{c8749761-deb7-44b1-55aa-5f5c9bdb7a11}"
+"ProgramProvider"="{00000000-0000-0000-0000-000000000000}"
+"Attach"=dword:00000001
+"AlwaysLoadLocal"=dword:00000001

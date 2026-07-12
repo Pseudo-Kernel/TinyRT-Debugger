@@ -184,9 +184,7 @@ HRESULT STDMETHODCALLTYPE
 DebugEngine::SetLocale(
     WORD LangId)
 {
-    UNREFERENCED_PARAMETER(LangId);
-
-    VsgdbLog(L"DebugEngine::SetLocale");
+    VsgdbLogFormat(L"DebugEngine::SetLocale: LangId 0x%hx", LangId);
 
     return S_OK;
 }
@@ -195,9 +193,16 @@ HRESULT STDMETHODCALLTYPE
 DebugEngine::SetRegistryRoot(
     LPCOLESTR RegistryRoot)
 {
-    UNREFERENCED_PARAMETER(RegistryRoot);
-
-    VsgdbLog(L"DebugEngine::SetRegistryRoot");
+    if (RegistryRoot != nullptr)
+    {
+        VsgdbLogFormat(
+            L"DebugEngine::SetRegistryRoot: %s",
+            RegistryRoot);
+    }
+    else
+    {
+        VsgdbLog(L"DebugEngine::SetRegistryRoot: null");
+    }
 
     return S_OK;
 }
@@ -207,10 +212,18 @@ DebugEngine::SetMetric(
     LPCOLESTR Metric,
     VARIANT Value)
 {
-    UNREFERENCED_PARAMETER(Metric);
-    UNREFERENCED_PARAMETER(Value);
+    if (Metric != nullptr)
+    {
+        VsgdbLogFormat(
+            L"DebugEngine::SetMetric: Metric %s",
+            Metric);
+    }
+    else
+    {
+        VsgdbLog(L"DebugEngine::SetMetric: Metric null");
+    }
 
-    VsgdbLog(L"DebugEngine::SetMetric");
+    UNREFERENCED_PARAMETER(Value);
 
     return S_OK;
 }

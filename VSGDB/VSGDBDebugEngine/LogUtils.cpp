@@ -51,3 +51,31 @@ VsgdbLog(
 
     fclose(File);
 }
+
+void
+VsgdbLogFormat(
+    const wchar_t* Format,
+    ...)
+{
+    wchar_t Buffer[1024];
+
+    va_list Arguments;
+    va_start(Arguments, Format);
+
+    HRESULT Hr =
+        StringCchVPrintfW(
+            Buffer,
+            _countof(Buffer),
+            Format,
+            Arguments);
+
+    va_end(Arguments);
+
+    if (FAILED(Hr))
+    {
+        VsgdbLog(L"VsgdbLogFormat formatting failed.");
+        return;
+    }
+
+    VsgdbLog(Buffer);
+}
