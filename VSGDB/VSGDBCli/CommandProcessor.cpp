@@ -1028,7 +1028,6 @@ CommandProcessor::ExecuteGo(
     }
 
     return true;
-//    return ContinueAllAndReportStop();
 }
 
 bool
