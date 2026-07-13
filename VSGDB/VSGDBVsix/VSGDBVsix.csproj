@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="Helper.cs" />
     <Compile Include="LoadDebugEngineCommand.cs" />
+    <Compile Include="NativeDebugEngineBridge.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="StartDebugSessionCommand.cs" />
     <Compile Include="VSGDBVsixPackage.cs" />
@@ -73,6 +74,11 @@
     <Content Include="Resources\LoadDebugEngineCommand.png" />
     <Content Include="..\x64\Debug\VSGDBDebugEngine.dll">
       <Link>VSGDBDebugEngine.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\x64\Debug\VSGDBDebugTargetStub.exe">
+      <Link>VSGDBDebugTargetStub.exe</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>

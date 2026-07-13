@@ -30,6 +30,13 @@ DebugEngine::QueryInterface(
         return S_OK;
     }
 
+    if (InterfaceId == __uuidof(IDebugEngineLaunch2))
+    {
+        *Object = static_cast<IDebugEngineLaunch2*>(this);
+        AddRef();
+        return S_OK;
+    }
+
     return E_NOINTERFACE;
 }
 
@@ -235,3 +242,68 @@ DebugEngine::CauseBreak()
 
     return E_NOTIMPL;
 }
+
+// 
+// IDebugEngineLaunch2
+//
+// 
+
+HRESULT STDMETHODCALLTYPE
+DebugEngine::LaunchSuspended(
+    LPCOLESTR Server,
+    IDebugPort2* Port,
+    LPCOLESTR Exe,
+    LPCOLESTR Args,
+    LPCOLESTR Dir,
+    BSTR Env,
+    LPCOLESTR Options,
+    LAUNCH_FLAGS LaunchFlags,
+    DWORD StandardInput,
+    DWORD StandardOutput,
+    DWORD StandardError,
+    IDebugEventCallback2* Callback,
+    IDebugProcess2** Process)
+{
+    VsgdbLogFormat(
+        L"DebugEngine::LaunchSuspended: Exe=%s Args=%s Dir=%s Options=%s",
+        Exe != nullptr ? Exe : L"(null)",
+        Args != nullptr ? Args : L"(null)",
+        Dir != nullptr ? Dir : L"(null)",
+        Options != nullptr ? Options : L"(null)");
+
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE
+DebugEngine::ResumeProcess(
+    IDebugProcess2 *Process)
+{
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: Process=%p",
+        Process);
+
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE
+DebugEngine::CanTerminateProcess(
+    IDebugProcess2 *Process)
+{
+    VsgdbLogFormat(
+        L"DebugEngine::CanTerminateProcess: Process=%p",
+        Process);
+
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE
+DebugEngine::TerminateProcess(
+    IDebugProcess2 *Process)
+{
+    VsgdbLogFormat(
+        L"DebugEngine::TerminateProcess: Process=%p",
+        Process);
+
+    return S_OK;
+}
+

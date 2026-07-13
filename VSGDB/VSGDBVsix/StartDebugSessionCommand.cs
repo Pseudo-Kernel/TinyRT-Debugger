@@ -2,6 +2,8 @@
 using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.ComponentModel.Design;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Task = System.Threading.Tasks.Task;
 
@@ -14,7 +16,14 @@ namespace VSGDBVsix
         public static readonly Guid CommandSet =
             new Guid("59f79947-34d9-41d9-90a3-2f2342317ee8");
 
+        private static readonly Guid GUID_VSGDBDebugEngine =
+            new Guid("9d760574-6f75-4c72-55aa-4b721e3c8c02");
+
         private readonly AsyncPackage Package_;
+
+        private System.Diagnostics.Process StubProcess_;
+        private IntPtr ProgramNode_;
+        private object ProgramNodeObject_;
 
         private StartDebugSessionCommand(
             AsyncPackage package,
@@ -67,16 +76,230 @@ namespace VSGDBVsix
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            System.Diagnostics.Debug.WriteLine(
-                "[VSGDBVsix] Start VSGDB Debug Session command executed");
+            ThreadHelper.JoinableTaskFactory.RunAsync(async delegate
+            {
+                try
+                {
+                    await LaunchVsgdbDebugTargetAsync();
 
-            VsShellUtilities.ShowMessageBox(
-                Package_,
-                "Start VSGDB Debug Session invoked.",
-                "VSGDB",
-                OLEMSGICON.OLEMSGICON_INFO,
-                OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                    VsShellUtilities.ShowMessageBox(
+                        Package_,
+                        "VSGDB debug target launch requested.",
+                        "VSGDB",
+                        OLEMSGICON.OLEMSGICON_INFO,
+                        OLEMSGBUTTON.OLEMSGBUTTON_OK,
+                        OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+                }
+                catch (Exception ex)
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                    VsShellUtilities.ShowMessageBox(
+                        Package_,
+                        ex.ToString(),
+                        "VSGDB session start failed",
+                        OLEMSGICON.OLEMSGICON_CRITICAL,
+                        OLEMSGBUTTON.OLEMSGBUTTON_OK,
+                        OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+                }
+            }).FileAndForget("VSGDB/StartDebugSession");
+        }
+
+        private static IntPtr AllocGuidArray(Guid[] guids)
+        {
+            int guidSize =
+                Marshal.SizeOf(typeof(Guid));
+
+            IntPtr buffer =
+                Marshal.AllocCoTaskMem(
+                    guidSize * guids.Length);
+
+            for (int i = 0; i < guids.Length; ++i)
+            {
+                IntPtr element =
+                    IntPtr.Add(
+                        buffer,
+                        i * guidSize);
+
+                Marshal.StructureToPtr(
+                    guids[i],
+                    element,
+                    false);
+            }
+
+            return buffer;
+        }
+
+        private async Task LaunchVsgdbDebugTargetAsync()
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            object service =
+                await Package_.GetServiceAsync(typeof(SVsShellDebugger));
+
+            IVsDebugger4 debugger4 =
+                service as IVsDebugger4;
+
+            if (debugger4 == null)
+            {
+                throw new InvalidOperationException(
+                    "SVsShellDebugger / IVsDebugger4 service is unavailable.");
+            }
+
+            IntPtr debugEngines = IntPtr.Zero;
+
+            try
+            {
+                EnsureProgramNode();
+
+                debugEngines =
+                    AllocGuidArray(
+                        new[] { GUID_VSGDBDebugEngine });
+
+                VsDebugTargetInfo4[] targets =
+                    new VsDebugTargetInfo4[1];
+
+                targets[0] = new VsDebugTargetInfo4();
+
+                targets[0].dlo =
+                    (uint)DEBUG_LAUNCH_OPERATION.DLO_CreateProcess;
+
+                string assemblyPath = 
+                    typeof(StartDebugSessionCommand).Assembly.Location;
+
+                string packageFolder =
+                    Path.GetDirectoryName(assemblyPath);
+
+                string stubPath =
+                    Path.Combine(
+                        packageFolder,
+                        "VSGDBDebugTargetStub.exe");
+
+                targets[0].bstrExe = stubPath;
+                targets[0].bstrArg = null;
+                targets[0].bstrCurDir =
+                    Path.GetDirectoryName(stubPath);
+
+                targets[0].dwProcessId = 0;
+
+                targets[0].guidLaunchDebugEngine = GUID_VSGDBDebugEngine;
+                targets[0].dwDebugEngineCount = 1;
+                targets[0].pDebugEngines = debugEngines;
+
+                targets[0].pUnknown = null; // ProgramNodeObject_;
+
+                targets[0].guidPortSupplier = Guid.Empty;
+                targets[0].bstrPortName = null;
+                targets[0].bstrOptions = null;
+                targets[0].fSendToOutputWindow = false;
+
+                targets[0].guidProcessLanguage = Guid.Empty;
+                targets[0].project = null;
+
+                VsDebugTargetProcessInfo[] results =
+                    new VsDebugTargetProcessInfo[1];
+
+                /// 
+                /// 
+                /// 
+
+                System.Diagnostics.Debug.WriteLine(typeof(VsDebugTargetProcessInfo).FullName);
+
+                foreach (var field in typeof(VsDebugTargetProcessInfo).GetFields())
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        "VsDebugTargetProcessInfo field: " +
+                        field.FieldType.FullName +
+                        " " +
+                        field.Name);
+                }
+
+                /// 
+                /// 
+                /// 
+
+                System.Diagnostics.Debug.WriteLine(
+                    "[VSGDBVsix] Calling IVsDebugger4.LaunchDebugTargets4");
+
+                debugger4.LaunchDebugTargets4(
+                    1,
+                    targets,
+                    results);
+
+                System.Diagnostics.Debug.WriteLine(
+                    "[VSGDBVsix] IVsDebugger4.LaunchDebugTargets4 returned");
+
+                DumpLaunchResult(results[0]);
+            }
+            finally
+            {
+                if (debugEngines != IntPtr.Zero)
+                {
+                    Marshal.FreeCoTaskMem(debugEngines);
+                }
+
+                // FIXME: End ProgramNode lifetime when LaunchDebugTargets4() fails
+            }
+        }
+
+        private static void DumpLaunchResult(VsDebugTargetProcessInfo result)
+        {
+            foreach (var field in typeof(VsDebugTargetProcessInfo).GetFields())
+            {
+                object value = field.GetValue(result);
+
+                System.Diagnostics.Debug.WriteLine(
+                    "[VSGDBVsix] LaunchResult." +
+                    field.Name +
+                    " = " +
+                    (value ?? "(null)"));
+            }
+        }
+
+        private void EnsureProgramNode()
+        {
+            if (ProgramNodeObject_ != null)
+            {
+                return;
+            }
+
+            ProgramNode_ =
+                NativeDebugEngineBridge.CreateDebugProgramNode();
+
+            ProgramNodeObject_ =
+                Marshal.GetObjectForIUnknown(ProgramNode_);
+        }
+
+        private System.Diagnostics.Process EnsureStubProcess()
+        {
+            if (StubProcess_ != null && !StubProcess_.HasExited)
+            {
+                return StubProcess_;
+            }
+
+            string assemblyPath =
+                typeof(StartDebugSessionCommand).Assembly.Location;
+
+            string packageFolder =
+                Path.GetDirectoryName(assemblyPath);
+
+            string stubPath =
+                Path.Combine(
+                    packageFolder,
+                    "VSGDBDebugTargetStub.exe");
+
+            StubProcess_ =
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = stubPath,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+
+            return StubProcess_;
         }
     }
 }

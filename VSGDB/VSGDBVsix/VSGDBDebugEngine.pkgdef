@@ -8,6 +8,11 @@
 [$RootKey$\AD7Metrics\Engine\{9d760574-6f75-4c72-55aa-4b721e3c8c02}]
 "Name"="VSGDB Debug Engine"
 "CLSID"="{c8749761-deb7-44b1-55aa-5f5c9bdb7a11}"
-"ProgramProvider"="{00000000-0000-0000-0000-000000000000}"
+"ProgramProvider"="{170ec3fc-4e80-40ab-a85a-55900c7c70de}"
 "Attach"=dword:00000001
 "AlwaysLoadLocal"=dword:00000001
+"Disassembly"=dword:00000001
+"SuspendThread"=dword:00000001
+"SetNextStatement"=dword:00000000
+"DataBP"=dword:00000000
+"DumpWriting"=dword:00000000

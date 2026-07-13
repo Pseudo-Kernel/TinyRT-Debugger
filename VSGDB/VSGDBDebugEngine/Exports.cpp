@@ -105,6 +105,38 @@ VsgdbDebugProgramNodeSmokeTest()
     return 0;
 }
 
+extern "C" __declspec(dllexport)
+HRESULT __stdcall
+VsgdbCreateDebugProgramNode(
+    IDebugProgramNode2** ProgramNode)
+{
+    VsgdbLog(L"VsgdbCreateDebugProgramNode");
+
+    if (ProgramNode == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    *ProgramNode = nullptr;
+
+    DebugProgramNode* Node = new (std::nothrow) DebugProgramNode();
+
+    if (Node == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    *ProgramNode = static_cast<IDebugProgramNode2*>(Node);
+
+    //
+    // Node starts with ReferenceCount_ == 1.
+    // Ownership is transferred to the caller.
+    //
+
+    return S_OK;
+}
+
+_Use_decl_annotations_
 extern "C"
 HRESULT STDMETHODCALLTYPE
 DllGetClassObject(
@@ -144,6 +176,7 @@ DllGetClassObject(
     return Result;
 }
 
+_Use_decl_annotations_
 extern "C"
 HRESULT STDMETHODCALLTYPE
 DllCanUnloadNow()

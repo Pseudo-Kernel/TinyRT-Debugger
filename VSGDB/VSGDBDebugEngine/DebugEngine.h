@@ -4,11 +4,13 @@
 #include <Unknwn.h>
 #include <OleAuto.h>
 #include <msdbg.h>
+#include <dbgmetric.h>
 
 #include <atomic>
 
 class DebugEngine final :
-    public IDebugEngine2
+    public IDebugEngine2,
+    public IDebugEngineLaunch2
 {
 public:
     DebugEngine();
@@ -64,6 +66,34 @@ public:
         VARIANT Value) override;
 
     HRESULT STDMETHODCALLTYPE CauseBreak() override;
+
+    // 
+    // IDebugEngineLaunch2
+    // 
+
+    HRESULT STDMETHODCALLTYPE LaunchSuspended(
+        LPCOLESTR pszServer,
+        IDebugPort2 *pPort,
+        LPCOLESTR pszExe,
+        LPCOLESTR pszArgs,
+        LPCOLESTR pszDir,
+        BSTR bstrEnv,
+        LPCOLESTR pszOptions,
+        LAUNCH_FLAGS dwLaunchFlags,
+        DWORD hStdInput,
+        DWORD hStdOutput,
+        DWORD hStdError,
+        IDebugEventCallback2 *pCallback,
+        IDebugProcess2 **ppProcess) override;
+
+    HRESULT STDMETHODCALLTYPE ResumeProcess(
+        IDebugProcess2 *pProcess) override;
+
+    HRESULT STDMETHODCALLTYPE CanTerminateProcess(
+        IDebugProcess2 *pProcess) override;
+
+    HRESULT STDMETHODCALLTYPE TerminateProcess(
+        IDebugProcess2 *pProcess) override;
 
 private:
     std::atomic<ULONG> ReferenceCount_ = 1;
