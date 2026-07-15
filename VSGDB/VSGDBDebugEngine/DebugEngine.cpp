@@ -1,6 +1,7 @@
 
 #include "DebugEngine.h"
 #include "DebugEvents.h"
+#include "DebugProgram.h"
 
 #include "LogUtils.h"
 #include "VSGDBDebugEngineGuids.h"
@@ -37,6 +38,12 @@ DebugEngine::~DebugEngine()
     {
         Callback_->Release();
         Callback_ = nullptr;
+    }
+
+    if (VsgdbProgram_ != nullptr)
+    {
+        VsgdbProgram_->Release();
+        VsgdbProgram_ = nullptr;
     }
 
     if (Process_ != nullptr)
@@ -466,14 +473,37 @@ DebugEngine::LaunchSuspended(
         Process_ = *Process;
     }
 
+#if 1
+    if (VsgdbProgram_ != nullptr)
+    {
+        VsgdbProgram_->Release();
+        VsgdbProgram_ = nullptr;
+    }
+
+    VsgdbProgram_ =
+        new (std::nothrow) DebugProgram(Process_);
+
+    if (VsgdbProgram_ == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    VsgdbLogFormat(
+        L"DebugEngine::LaunchSuspended: Created VsgdbProgram_=%p",
+        VsgdbProgram_);
+#endif
+
     VsgdbLogFormat(
         L"DebugEngine::LaunchSuspended: Stored Callback_=%p Process_=%p",
         Callback_,
         Process_);
 
+    //
+    // Diagnostic only: this returns the default port's "Native" program,
+    // not a VSGDB-owned program.
+    //
     HRESULT ProgramHr =
-        CaptureProgramFromProcess(
-            Process_);
+        CaptureProgramFromProcess(Process_);
 
     VsgdbLogFormat(
         L"DebugEngine::LaunchSuspended: CaptureProgramFromProcess Hr=0x%08x Program_=%p",
@@ -492,6 +522,18 @@ DebugEngine::LaunchSuspended(
         if (FAILED(EngineCreateHr))
         {
             return EngineCreateHr;
+        }
+
+        HRESULT ProgramCreateHr =
+            SendProgramCreateEvent();
+
+        VsgdbLogFormat(
+            L"DebugEngine::LaunchSuspended: ProgramCreateEvent Hr=0x%08x",
+            ProgramCreateHr);
+
+        if (FAILED(ProgramCreateHr))
+        {
+            return ProgramCreateHr;
         }
 
 #if 0
@@ -804,6 +846,12 @@ DebugEngine::SendEngineCreateEvent()
 HRESULT
 DebugEngine::SendProgramCreateEvent()
 {
+    if (VsgdbProgram_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendProgramCreateEvent: VsgdbProgram_ is null");
+        return E_UNEXPECTED;
+    }
+
     DebugProgramCreateEvent* Event =
         new (std::nothrow) DebugProgramCreateEvent();
 
@@ -817,7 +865,7 @@ DebugEngine::SendProgramCreateEvent()
             static_cast<IDebugEvent2*>(Event),
             __uuidof(IDebugProgramCreateEvent2),
             EVENT_ASYNCHRONOUS,
-            Program_,
+            static_cast<IDebugProgram2*>(VsgdbProgram_),
             nullptr);
 
     Event->Release();

@@ -11,7 +11,8 @@ class DebugProgram final :
     public IDebugProgram2
 {
 public:
-    DebugProgram();
+    explicit DebugProgram(
+        IDebugProcess2* Process);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(
         REFIID InterfaceId,
@@ -96,4 +97,5 @@ private:
 
     std::atomic<ULONG> ReferenceCount_ = 1;
     GUID ProgramId_ = {};
+    IDebugProcess2* Process_ = nullptr;
 };

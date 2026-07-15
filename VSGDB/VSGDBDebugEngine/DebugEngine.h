@@ -8,6 +8,8 @@
 
 #include <atomic>
 
+class DebugProgram;
+
 class DebugEngine final :
     public IDebugEngine2,
     public IDebugEngineLaunch2
@@ -129,4 +131,7 @@ private:
     IDebugEventCallback2* Callback_ = nullptr;
     IDebugProcess2* Process_ = nullptr;
     IDebugProgram2* Program_ = nullptr;
+
+private:
+    DebugProgram* VsgdbProgram_ = nullptr;
 };

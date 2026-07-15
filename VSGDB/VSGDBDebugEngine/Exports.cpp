@@ -144,7 +144,7 @@ VsgdbDebugProgramSmokeTest()
     VsgdbLog(L"VsgdbDebugProgramSmokeTest begin");
 
     DebugProgram* Program =
-        new (std::nothrow) DebugProgram();
+        new (std::nothrow) DebugProgram(nullptr);
 
     if (Program == nullptr)
     {

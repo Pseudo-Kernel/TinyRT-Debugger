@@ -5,9 +5,17 @@
 
 #include <combaseapi.h>
 
-DebugProgram::DebugProgram()
+DebugProgram::DebugProgram(
+    IDebugProcess2* Process)
 {
     CoCreateGuid(&ProgramId_);
+
+    Process_ = Process;
+
+    if (Process_ != nullptr)
+    {
+        Process_->AddRef();
+    }
 
     VsgdbLog(L"DebugProgram created");
 }
@@ -15,6 +23,12 @@ DebugProgram::DebugProgram()
 DebugProgram::~DebugProgram()
 {
     VsgdbLog(L"DebugProgram destroyed");
+
+    if (Process_ != nullptr)
+    {
+        Process_->Release();
+        Process_ = nullptr;
+    }
 }
 
 HRESULT STDMETHODCALLTYPE
@@ -110,13 +124,15 @@ DebugProgram::GetProcess(
         return E_POINTER;
     }
 
-    *Process = nullptr;
+    *Process = Process_;
 
-    //
-    // We will wire this once DebugProgram is owned by DebugEngine and
-    // associated with the AD7 process returned by the default port.
-    //
-    return E_NOTIMPL;
+    if (*Process != nullptr)
+    {
+        (*Process)->AddRef();
+        return S_OK;
+    }
+
+    return E_UNEXPECTED;
 }
 
 HRESULT STDMETHODCALLTYPE
