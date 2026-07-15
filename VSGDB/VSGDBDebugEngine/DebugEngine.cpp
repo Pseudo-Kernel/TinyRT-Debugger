@@ -4,10 +4,30 @@
 #include "LogUtils.h"
 #include "VSGDBDebugEngineGuids.h"
 
+#include <cwctype>
+#include <string>
+
 DebugEngine::DebugEngine()
     : ReferenceCount_(1)
 {
     VsgdbLog(L"DebugEngine created");
+}
+
+DebugEngine::~DebugEngine()
+{
+    VsgdbLog(L"DebugEngine destroyed");
+
+    if (LaunchedThreadHandle_ != nullptr)
+    {
+        CloseHandle(LaunchedThreadHandle_);
+        LaunchedThreadHandle_ = nullptr;
+    }
+
+    if (LaunchedProcessHandle_ != nullptr)
+    {
+        CloseHandle(LaunchedProcessHandle_);
+        LaunchedProcessHandle_ = nullptr;
+    }
 }
 
 HRESULT STDMETHODCALLTYPE
@@ -58,7 +78,6 @@ DebugEngine::Release()
 
     if (NewReferenceCount == 0)
     {
-        VsgdbLog(L"DebugEngine destroyed");
         delete this;
     }
 
@@ -88,15 +107,13 @@ DebugEngine::Attach(
     IDebugEventCallback2* Callback,
     ATTACH_REASON Reason)
 {
-    UNREFERENCED_PARAMETER(Programs);
-    UNREFERENCED_PARAMETER(ProgramNodes);
-    UNREFERENCED_PARAMETER(ProgramCount);
-    UNREFERENCED_PARAMETER(Callback);
-    UNREFERENCED_PARAMETER(Reason);
+    VsgdbLogFormat(
+        L"DebugEngine::Attach: ProgramCount=%lu Callback=%p Reason=%lu",
+        ProgramCount,
+        Callback,
+        Reason);
 
-    VsgdbLog(L"DebugEngine::Attach");
-
-    return E_NOTIMPL;
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE
@@ -264,6 +281,12 @@ DebugEngine::LaunchSuspended(
     IDebugEventCallback2* Callback,
     IDebugProcess2** Process)
 {
+    UNREFERENCED_PARAMETER(Server);
+    UNREFERENCED_PARAMETER(Env);
+    UNREFERENCED_PARAMETER(Options);
+    UNREFERENCED_PARAMETER(LaunchFlags);
+    UNREFERENCED_PARAMETER(Callback);
+
     VsgdbLogFormat(
         L"DebugEngine::LaunchSuspended: Exe=%s Args=%s Dir=%s Options=%s",
         Exe != nullptr ? Exe : L"(null)",
@@ -271,16 +294,166 @@ DebugEngine::LaunchSuspended(
         Dir != nullptr ? Dir : L"(null)",
         Options != nullptr ? Options : L"(null)");
 
-    return E_NOTIMPL;
+    if (Port == nullptr || Process == nullptr || Exe == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    *Process = nullptr;
+
+    IDebugDefaultPort2* DefaultPort = nullptr;
+
+    HRESULT Hr =
+        Port->QueryInterface(
+            __uuidof(IDebugDefaultPort2),
+            reinterpret_cast<void**>(&DefaultPort));
+
+    if (FAILED(Hr) || DefaultPort == nullptr)
+    {
+        VsgdbLogFormat(
+            L"DebugEngine::LaunchSuspended: QI IDebugDefaultPort2 failed Hr=0x%08x",
+            Hr);
+
+        return Hr;
+    }
+
+    std::wstring CommandLine;
+
+    CommandLine += L"\"";
+    CommandLine += Exe;
+    CommandLine += L"\"";
+
+    if (Args != nullptr && Args[0] != L'\0')
+    {
+        CommandLine += L" ";
+        CommandLine += Args;
+    }
+
+    STARTUPINFOW StartupInfo = {};
+    StartupInfo.cb = sizeof(StartupInfo);
+
+    if (StandardInput != 0 ||
+        StandardOutput != 0 ||
+        StandardError != 0)
+    {
+        StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
+        StartupInfo.hStdInput =
+            reinterpret_cast<HANDLE>(
+                static_cast<uintptr_t>(StandardInput));
+        StartupInfo.hStdOutput =
+            reinterpret_cast<HANDLE>(
+                static_cast<uintptr_t>(StandardOutput));
+        StartupInfo.hStdError =
+            reinterpret_cast<HANDLE>(
+                static_cast<uintptr_t>(StandardError));
+    }
+
+    PROCESS_INFORMATION ProcessInformation = {};
+
+    BOOL Created =
+        CreateProcessW(
+            Exe,
+            CommandLine.data(),
+            nullptr,
+            nullptr,
+            TRUE,
+            CREATE_SUSPENDED,
+            nullptr,
+            Dir,
+            &StartupInfo,
+            &ProcessInformation);
+
+    if (!Created)
+    {
+        DWORD Error = GetLastError();
+
+        VsgdbLogFormat(
+            L"DebugEngine::LaunchSuspended: CreateProcessW failed Error=%lu",
+            Error);
+
+        DefaultPort->Release();
+
+        return HRESULT_FROM_WIN32(Error);
+    }
+
+    LaunchedProcessId_ = ProcessInformation.dwProcessId;
+    LaunchedProcessHandle_ = ProcessInformation.hProcess;
+    LaunchedThreadHandle_ = ProcessInformation.hThread;
+
+    VsgdbLogFormat(
+        L"DebugEngine::LaunchSuspended: Created PID=%lu TID=%lu",
+        ProcessInformation.dwProcessId,
+        ProcessInformation.dwThreadId);
+
+    AD_PROCESS_ID ProcessId = {};
+    ProcessId.ProcessIdType = AD_PROCESS_ID_SYSTEM;
+    ProcessId.ProcessId.dwProcessId = ProcessInformation.dwProcessId;
+
+    Hr = DefaultPort->GetProcess(
+        ProcessId,
+        Process);
+
+    VsgdbLogFormat(
+        L"DebugEngine::LaunchSuspended: DefaultPort->GetProcess Hr=0x%08x Process=%p",
+        Hr,
+        Process != nullptr ? *Process : nullptr);
+
+    DefaultPort->Release();
+
+    if (FAILED(Hr))
+    {
+        ::TerminateProcess(
+            LaunchedProcessHandle_,
+            1);
+
+        CloseHandle(LaunchedThreadHandle_);
+        CloseHandle(LaunchedProcessHandle_);
+
+        LaunchedThreadHandle_ = nullptr;
+        LaunchedProcessHandle_ = nullptr;
+        LaunchedProcessId_ = 0;
+
+        return Hr;
+    }
+
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE
 DebugEngine::ResumeProcess(
-    IDebugProcess2 *Process)
+    IDebugProcess2* Process)
 {
     VsgdbLogFormat(
         L"DebugEngine::ResumeProcess: Process=%p",
         Process);
+
+    if (LaunchedThreadHandle_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::ResumeProcess: no suspended thread handle");
+        return S_OK;
+    }
+
+    DWORD Result =
+        ResumeThread(
+            LaunchedThreadHandle_);
+
+    if (Result == static_cast<DWORD>(-1))
+    {
+        DWORD Error = GetLastError();
+
+        VsgdbLogFormat(
+            L"DebugEngine::ResumeProcess: ResumeThread failed Error=%lu",
+            Error);
+
+        return HRESULT_FROM_WIN32(Error);
+    }
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: ResumeThread previous suspend count=%lu",
+        Result);
+
+    CloseHandle(LaunchedThreadHandle_);
+    LaunchedThreadHandle_ = nullptr;
 
     return S_OK;
 }
@@ -298,11 +471,29 @@ DebugEngine::CanTerminateProcess(
 
 HRESULT STDMETHODCALLTYPE
 DebugEngine::TerminateProcess(
-    IDebugProcess2 *Process)
+    IDebugProcess2* Process)
 {
     VsgdbLogFormat(
         L"DebugEngine::TerminateProcess: Process=%p",
         Process);
+
+    if (LaunchedProcessHandle_ != nullptr)
+    {
+        ::TerminateProcess(
+            LaunchedProcessHandle_,
+            1);
+
+        CloseHandle(LaunchedProcessHandle_);
+        LaunchedProcessHandle_ = nullptr;
+    }
+
+    if (LaunchedThreadHandle_ != nullptr)
+    {
+        CloseHandle(LaunchedThreadHandle_);
+        LaunchedThreadHandle_ = nullptr;
+    }
+
+    LaunchedProcessId_ = 0;
 
     return S_OK;
 }

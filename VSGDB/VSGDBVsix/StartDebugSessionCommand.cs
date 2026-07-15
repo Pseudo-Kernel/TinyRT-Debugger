@@ -21,10 +21,6 @@ namespace VSGDBVsix
 
         private readonly AsyncPackage Package_;
 
-        private System.Diagnostics.Process StubProcess_;
-        private IntPtr ProgramNode_;
-        private object ProgramNodeObject_;
-
         private StartDebugSessionCommand(
             AsyncPackage package,
             OleMenuCommandService commandService)
@@ -83,14 +79,6 @@ namespace VSGDBVsix
                     await LaunchVsgdbDebugTargetAsync();
 
                     await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-                    VsShellUtilities.ShowMessageBox(
-                        Package_,
-                        "VSGDB debug target launch requested.",
-                        "VSGDB",
-                        OLEMSGICON.OLEMSGICON_INFO,
-                        OLEMSGBUTTON.OLEMSGBUTTON_OK,
-                        OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
                 }
                 catch (Exception ex)
                 {
@@ -152,8 +140,6 @@ namespace VSGDBVsix
 
             try
             {
-                EnsureProgramNode();
-
                 debugEngines =
                     AllocGuidArray(
                         new[] { GUID_VSGDBDebugEngine });
@@ -201,25 +187,6 @@ namespace VSGDBVsix
                 VsDebugTargetProcessInfo[] results =
                     new VsDebugTargetProcessInfo[1];
 
-                /// 
-                /// 
-                /// 
-
-                System.Diagnostics.Debug.WriteLine(typeof(VsDebugTargetProcessInfo).FullName);
-
-                foreach (var field in typeof(VsDebugTargetProcessInfo).GetFields())
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        "VsDebugTargetProcessInfo field: " +
-                        field.FieldType.FullName +
-                        " " +
-                        field.Name);
-                }
-
-                /// 
-                /// 
-                /// 
-
                 System.Diagnostics.Debug.WriteLine(
                     "[VSGDBVsix] Calling IVsDebugger4.LaunchDebugTargets4");
 
@@ -256,50 +223,6 @@ namespace VSGDBVsix
                     " = " +
                     (value ?? "(null)"));
             }
-        }
-
-        private void EnsureProgramNode()
-        {
-            if (ProgramNodeObject_ != null)
-            {
-                return;
-            }
-
-            ProgramNode_ =
-                NativeDebugEngineBridge.CreateDebugProgramNode();
-
-            ProgramNodeObject_ =
-                Marshal.GetObjectForIUnknown(ProgramNode_);
-        }
-
-        private System.Diagnostics.Process EnsureStubProcess()
-        {
-            if (StubProcess_ != null && !StubProcess_.HasExited)
-            {
-                return StubProcess_;
-            }
-
-            string assemblyPath =
-                typeof(StartDebugSessionCommand).Assembly.Location;
-
-            string packageFolder =
-                Path.GetDirectoryName(assemblyPath);
-
-            string stubPath =
-                Path.Combine(
-                    packageFolder,
-                    "VSGDBDebugTargetStub.exe");
-
-            StubProcess_ =
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = stubPath,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    });
-
-            return StubProcess_;
         }
     }
 }

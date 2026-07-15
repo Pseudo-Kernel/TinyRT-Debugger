@@ -15,6 +15,8 @@ class DebugEngine final :
 public:
     DebugEngine();
 
+    ~DebugEngine();
+
     HRESULT STDMETHODCALLTYPE QueryInterface(
         REFIID InterfaceId,
         void** Object) override;
@@ -97,4 +99,9 @@ public:
 
 private:
     std::atomic<ULONG> ReferenceCount_ = 1;
+
+private:
+    DWORD LaunchedProcessId_ = 0;
+    HANDLE LaunchedProcessHandle_ = nullptr;
+    HANDLE LaunchedThreadHandle_ = nullptr;
 };
