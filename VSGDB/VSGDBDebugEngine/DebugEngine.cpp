@@ -1,11 +1,15 @@
 
 #include "DebugEngine.h"
+#include "DebugEvents.h"
 
 #include "LogUtils.h"
 #include "VSGDBDebugEngineGuids.h"
 
 #include <cwctype>
 #include <string>
+
+
+
 
 DebugEngine::DebugEngine()
     : ReferenceCount_(1)
@@ -27,6 +31,24 @@ DebugEngine::~DebugEngine()
     {
         CloseHandle(LaunchedProcessHandle_);
         LaunchedProcessHandle_ = nullptr;
+    }
+
+    if (Callback_ != nullptr)
+    {
+        Callback_->Release();
+        Callback_ = nullptr;
+    }
+
+    if (Process_ != nullptr)
+    {
+        Process_->Release();
+        Process_ = nullptr;
+    }
+
+    if (Program_ != nullptr)
+    {
+        Program_->Release();
+        Program_ = nullptr;
     }
 }
 
@@ -294,6 +316,10 @@ DebugEngine::LaunchSuspended(
         Dir != nullptr ? Dir : L"(null)",
         Options != nullptr ? Options : L"(null)");
 
+    VsgdbLogFormat(
+        L"DebugEngine::LaunchSuspended: Callback=%p",
+        Callback);
+
     if (Port == nullptr || Process == nullptr || Exe == nullptr)
     {
         return E_POINTER;
@@ -416,6 +442,82 @@ DebugEngine::LaunchSuspended(
         return Hr;
     }
 
+    if (Callback != nullptr)
+    {
+        Callback->AddRef();
+
+        if (Callback_ != nullptr)
+        {
+            Callback_->Release();
+        }
+
+        Callback_ = Callback;
+    }
+
+    if (*Process != nullptr)
+    {
+        (*Process)->AddRef();
+
+        if (Process_ != nullptr)
+        {
+            Process_->Release();
+        }
+
+        Process_ = *Process;
+    }
+
+    VsgdbLogFormat(
+        L"DebugEngine::LaunchSuspended: Stored Callback_=%p Process_=%p",
+        Callback_,
+        Process_);
+
+    HRESULT ProgramHr =
+        CaptureProgramFromProcess(
+            Process_);
+
+    VsgdbLogFormat(
+        L"DebugEngine::LaunchSuspended: CaptureProgramFromProcess Hr=0x%08x Program_=%p",
+        ProgramHr,
+        Program_);
+
+    if (Callback_ != nullptr)
+    {
+        HRESULT EngineCreateHr =
+            SendEngineCreateEvent();
+
+        VsgdbLogFormat(
+            L"DebugEngine::LaunchSuspended: EngineCreateEvent Hr=0x%08x",
+            EngineCreateHr);
+
+        if (FAILED(EngineCreateHr))
+        {
+            return EngineCreateHr;
+        }
+
+#if 0
+        if (SUCCEEDED(ProgramHr) && Program_ != nullptr)
+        {
+            HRESULT ProgramCreateHr =
+                SendProgramCreateEvent();
+
+            VsgdbLogFormat(
+                L"DebugEngine::LaunchSuspended: ProgramCreateEvent Hr=0x%08x",
+                ProgramCreateHr);
+        }
+        else
+        {
+            VsgdbLog(
+                L"DebugEngine::LaunchSuspended: no Program_, skipping ProgramCreateEvent");
+        }
+#endif
+    }
+    else
+    {
+        VsgdbLog(
+            L"DebugEngine::LaunchSuspended: Callback is null, skipping EngineCreateEvent");
+    }
+
+
     return S_OK;
 }
 
@@ -498,3 +600,231 @@ DebugEngine::TerminateProcess(
     return S_OK;
 }
 
+
+
+// 
+// Helpers.
+// 
+
+HRESULT
+DebugEngine::CaptureProgramFromProcess(
+    IDebugProcess2* Process)
+{
+    VsgdbLogFormat(
+        L"DebugEngine::CaptureProgramFromProcess: Process=%p",
+        Process);
+
+    if (Process == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    IEnumDebugPrograms2* EnumPrograms = nullptr;
+
+    HRESULT Hr =
+        Process->EnumPrograms(
+            &EnumPrograms);
+
+    VsgdbLogFormat(
+        L"DebugEngine::CaptureProgramFromProcess: EnumPrograms Hr=0x%08x Enum=%p",
+        Hr,
+        EnumPrograms);
+
+    if (FAILED(Hr) || EnumPrograms == nullptr)
+    {
+        return Hr;
+    }
+
+    ULONG Fetched = 0;
+    IDebugProgram2* Program = nullptr;
+
+    Hr =
+        EnumPrograms->Next(
+            1,
+            &Program,
+            &Fetched);
+
+    VsgdbLogFormat(
+        L"DebugEngine::CaptureProgramFromProcess: Next Hr=0x%08x Fetched=%lu Program=%p",
+        Hr,
+        Fetched,
+        Program);
+
+    EnumPrograms->Release();
+
+    if (FAILED(Hr))
+    {
+        return Hr;
+    }
+
+    if (Fetched != 1 || Program == nullptr)
+    {
+        return E_FAIL;
+    }
+
+    LogProgramInfo(Program);
+
+    if (Program_ != nullptr)
+    {
+        Program_->Release();
+        Program_ = nullptr;
+    }
+
+    Program_ = Program;
+    Program_->AddRef();
+
+    //
+    // Release the local enumeration reference. Program_ keeps its own reference.
+    //
+    Program->Release();
+
+    VsgdbLogFormat(
+        L"DebugEngine::CaptureProgramFromProcess: Stored Program_=%p",
+        Program_);
+
+    return S_OK;
+}
+
+void
+DebugEngine::LogProgramInfo(
+    IDebugProgram2* Program)
+{
+    if (Program == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::LogProgramInfo: Program is null");
+        return;
+    }
+
+    BSTR Name = nullptr;
+
+    HRESULT Hr =
+        Program->GetName(
+            &Name);
+
+    if (SUCCEEDED(Hr) && Name != nullptr)
+    {
+        VsgdbLogFormat(
+            L"DebugEngine::LogProgramInfo: Name=%s",
+            Name);
+
+        SysFreeString(Name);
+    }
+    else
+    {
+        VsgdbLogFormat(
+            L"DebugEngine::LogProgramInfo: GetName Hr=0x%08x",
+            Hr);
+    }
+
+    GUID ProgramId = {};
+
+    Hr =
+        Program->GetProgramId(
+            &ProgramId);
+
+    VsgdbLogFormat(
+        L"DebugEngine::LogProgramInfo: GetProgramId Hr=0x%08x",
+        Hr);
+}
+
+HRESULT
+DebugEngine::SendEvent(
+    IDebugEvent2* Event,
+    REFIID EventInterfaceId,
+    DWORD Attributes,
+    IDebugProgram2* Program,
+    IDebugThread2* Thread)
+{
+    VsgdbLogFormat(
+        L"DebugEngine::SendEvent: Callback_=%p Process_=%p Program=%p Thread=%p Event=%p Attributes=0x%08x",
+        Callback_,
+        Process_,
+        Program,
+        Thread,
+        Event,
+        Attributes);
+
+    if (Callback_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendEvent: Callback_ is null");
+        return E_UNEXPECTED;
+    }
+
+    if (Event == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    HRESULT Hr =
+        Callback_->Event(
+            static_cast<IDebugEngine2*>(this),
+            Process_,
+            Program,
+            Thread,
+            Event,
+            EventInterfaceId,
+            Attributes);
+
+    VsgdbLogFormat(
+        L"DebugEngine::SendEvent: Callback_->Event Hr=0x%08x",
+        Hr);
+
+    return Hr;
+}
+
+HRESULT
+DebugEngine::SendEngineCreateEvent()
+{
+    DebugEngineCreateEvent* Event =
+        new (std::nothrow) DebugEngineCreateEvent(
+            static_cast<IDebugEngine2*>(this));
+
+    if (Event == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    HRESULT Hr =
+        SendEvent(
+            static_cast<IDebugEvent2*>(Event),
+            __uuidof(IDebugEngineCreateEvent2),
+            EVENT_ASYNCHRONOUS,
+            nullptr,
+            nullptr);
+
+    Event->Release();
+
+    VsgdbLogFormat(
+        L"DebugEngine::SendEngineCreateEvent: Hr=0x%08x",
+        Hr);
+
+    return Hr;
+}
+
+HRESULT
+DebugEngine::SendProgramCreateEvent()
+{
+    DebugProgramCreateEvent* Event =
+        new (std::nothrow) DebugProgramCreateEvent();
+
+    if (Event == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    HRESULT Hr =
+        SendEvent(
+            static_cast<IDebugEvent2*>(Event),
+            __uuidof(IDebugProgramCreateEvent2),
+            EVENT_ASYNCHRONOUS,
+            Program_,
+            nullptr);
+
+    Event->Release();
+
+    VsgdbLogFormat(
+        L"DebugEngine::SendProgramCreateEvent: Hr=0x%08x",
+        Hr);
+
+    return Hr;
+}

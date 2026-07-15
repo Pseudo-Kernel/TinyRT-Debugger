@@ -69,6 +69,7 @@ public:
 
     HRESULT STDMETHODCALLTYPE CauseBreak() override;
 
+
     // 
     // IDebugEngineLaunch2
     // 
@@ -98,10 +99,34 @@ public:
         IDebugProcess2 *pProcess) override;
 
 private:
+    HRESULT SendEvent(
+        IDebugEvent2* Event, 
+        REFIID EventInterfaceId, 
+        DWORD Attributes, 
+        IDebugProgram2* Program, 
+        IDebugThread2* Thread);
+
+    HRESULT SendEngineCreateEvent();
+
+    HRESULT SendProgramCreateEvent();
+
+    HRESULT CaptureProgramFromProcess(
+        IDebugProcess2* Process);
+
+    void LogProgramInfo(
+        IDebugProgram2* Program);
+
+
+private:
     std::atomic<ULONG> ReferenceCount_ = 1;
 
 private:
     DWORD LaunchedProcessId_ = 0;
     HANDLE LaunchedProcessHandle_ = nullptr;
     HANDLE LaunchedThreadHandle_ = nullptr;
+
+private:
+    IDebugEventCallback2* Callback_ = nullptr;
+    IDebugProcess2* Process_ = nullptr;
+    IDebugProgram2* Program_ = nullptr;
 };

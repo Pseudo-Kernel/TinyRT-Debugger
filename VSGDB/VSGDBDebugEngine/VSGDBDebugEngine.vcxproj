@@ -169,6 +169,7 @@
   <ItemGroup>
     <ClCompile Include="DebugEngine.cpp" />
     <ClCompile Include="DebugEngineClassFactory.cpp" />
+    <ClCompile Include="DebugEvents.cpp" />
     <ClCompile Include="DebugProgramNode.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Exports.cpp" />
@@ -178,6 +179,7 @@
   <ItemGroup>
     <ClInclude Include="DebugEngine.h" />
     <ClInclude Include="DebugEngineClassFactory.h" />
+    <ClInclude Include="DebugEvents.h" />
     <ClInclude Include="DebugProgramNode.h" />
     <ClInclude Include="LogUtils.h" />
     <ClInclude Include="SessionHost.h" />
