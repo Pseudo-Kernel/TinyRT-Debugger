@@ -170,6 +170,7 @@
     <ClCompile Include="DebugEngine.cpp" />
     <ClCompile Include="DebugEngineClassFactory.cpp" />
     <ClCompile Include="DebugEvents.cpp" />
+    <ClCompile Include="DebugProgram.cpp" />
     <ClCompile Include="DebugProgramNode.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Exports.cpp" />
@@ -180,6 +181,7 @@
     <ClInclude Include="DebugEngine.h" />
     <ClInclude Include="DebugEngineClassFactory.h" />
     <ClInclude Include="DebugEvents.h" />
+    <ClInclude Include="DebugProgram.h" />
     <ClInclude Include="DebugProgramNode.h" />
     <ClInclude Include="LogUtils.h" />
     <ClInclude Include="SessionHost.h" />

@@ -3,6 +3,7 @@
 
 #include "DebugEngine.h"
 #include "DebugProgramNode.h"
+#include "DebugProgram.h"
 #include "DebugEngineClassFactory.h"
 #include "VSGDBDebugEngineGuids.h"
 #include "SessionHost.h"
@@ -134,6 +135,86 @@ VsgdbCreateDebugProgramNode(
     //
 
     return S_OK;
+}
+
+extern "C" __declspec(dllexport)
+int __stdcall
+VsgdbDebugProgramSmokeTest()
+{
+    VsgdbLog(L"VsgdbDebugProgramSmokeTest begin");
+
+    DebugProgram* Program =
+        new (std::nothrow) DebugProgram();
+
+    if (Program == nullptr)
+    {
+        return static_cast<int>(E_OUTOFMEMORY);
+    }
+
+    BSTR Name = nullptr;
+    HRESULT Hr =
+        Program->GetName(
+            &Name);
+
+    if (FAILED(Hr))
+    {
+        Program->Release();
+        return static_cast<int>(Hr);
+    }
+
+    if (Name != nullptr)
+    {
+        VsgdbLogFormat(
+            L"DebugProgram name=%s",
+            Name);
+
+        SysFreeString(Name);
+    }
+
+    GUID ProgramId = {};
+    Hr =
+        Program->GetProgramId(
+            &ProgramId);
+
+    if (FAILED(Hr))
+    {
+        Program->Release();
+        return static_cast<int>(Hr);
+    }
+
+    BSTR EngineName = nullptr;
+    GUID EngineGuid = {};
+    Hr =
+        Program->GetEngineInfo(
+            &EngineName,
+            &EngineGuid);
+
+    if (FAILED(Hr))
+    {
+        Program->Release();
+        return static_cast<int>(Hr);
+    }
+
+    if (EngineName != nullptr)
+    {
+        VsgdbLogFormat(
+            L"DebugProgram engine=%s",
+            EngineName);
+
+        SysFreeString(EngineName);
+    }
+
+    if (EngineGuid != GUID_VSGDBDebugEngine)
+    {
+        Program->Release();
+        return -1;
+    }
+
+    Program->Release();
+
+    VsgdbLog(L"VsgdbDebugProgramSmokeTest end");
+
+    return 0;
 }
 
 _Use_decl_annotations_

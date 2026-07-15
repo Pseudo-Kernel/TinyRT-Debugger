@@ -9,6 +9,6 @@ VsgdbCreateDebugProgramNode
 
 VsgdbDebugEngineSmokeTest       ; for test only
 VsgdbDebugProgramNodeSmokeTest  ; for test only
-
+VsgdbDebugProgramSmokeTest      ; for test only
 
 

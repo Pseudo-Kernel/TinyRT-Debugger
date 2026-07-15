@@ -28,6 +28,11 @@ wmain(
                 EngineDll,
                 "VsgdbDebugProgramNodeSmokeTest");
 
+        DllFunction<int __stdcall()>
+            DebugProgramSmokeTest(
+                EngineDll,
+                "VsgdbDebugProgramSmokeTest");
+
         int Result =
             EngineSmokeTest(
                 L"127.0.0.1",
@@ -39,6 +44,13 @@ wmain(
         }
 
         Result = ProgramNodeSmokeTest();
+
+        if (Result != 0)
+        {
+            return Result;
+        }
+
+        Result = DebugProgramSmokeTest();
 
         if (Result != 0)
         {
