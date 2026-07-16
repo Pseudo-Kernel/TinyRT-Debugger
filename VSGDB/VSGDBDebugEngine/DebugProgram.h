@@ -7,6 +7,8 @@
 
 #include <atomic>
 
+class DebugThread;
+
 class DebugProgram final :
     public IDebugProgram2
 {
@@ -98,4 +100,5 @@ private:
     std::atomic<ULONG> ReferenceCount_ = 1;
     GUID ProgramId_ = {};
     IDebugProcess2* Process_ = nullptr;
+    DebugThread* MainThread_ = nullptr;
 };

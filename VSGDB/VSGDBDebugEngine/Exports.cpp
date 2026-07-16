@@ -210,6 +210,63 @@ VsgdbDebugProgramSmokeTest()
         return -1;
     }
 
+    IEnumDebugThreads2* EnumThreads = nullptr;
+    Hr =
+        Program->EnumThreads(
+            &EnumThreads);
+
+    if (FAILED(Hr) || EnumThreads == nullptr)
+    {
+        Program->Release();
+        return static_cast<int>(FAILED(Hr) ? Hr : E_FAIL);
+    }
+
+    ULONG ThreadCount = 0;
+    Hr =
+        EnumThreads->GetCount(
+            &ThreadCount);
+
+    VsgdbLogFormat(
+        L"DebugProgram thread count=%lu Hr=0x%08x",
+        ThreadCount,
+        Hr);
+
+    IDebugThread2* Thread = nullptr;
+    ULONG Fetched = 0;
+
+    Hr =
+        EnumThreads->Next(
+            1,
+            &Thread,
+            &Fetched);
+
+    VsgdbLogFormat(
+        L"DebugProgram first thread Hr=0x%08x Fetched=%lu Thread=%p",
+        Hr,
+        Fetched,
+        Thread);
+
+    if (Thread != nullptr)
+    {
+        BSTR ThreadName = nullptr;
+        Hr =
+            Thread->GetName(
+                &ThreadName);
+
+        if (SUCCEEDED(Hr) && ThreadName != nullptr)
+        {
+            VsgdbLogFormat(
+                L"DebugThread name=%s",
+                ThreadName);
+
+            SysFreeString(ThreadName);
+        }
+
+        Thread->Release();
+    }
+
+    EnumThreads->Release();
+
     Program->Release();
 
     VsgdbLog(L"VsgdbDebugProgramSmokeTest end");

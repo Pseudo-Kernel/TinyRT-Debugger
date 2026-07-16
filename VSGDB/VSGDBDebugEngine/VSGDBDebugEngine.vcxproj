@@ -172,7 +172,9 @@
     <ClCompile Include="DebugEvents.cpp" />
     <ClCompile Include="DebugProgram.cpp" />
     <ClCompile Include="DebugProgramNode.cpp" />
+    <ClCompile Include="DebugThread.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="EnumDebugThreads.cpp" />
     <ClCompile Include="Exports.cpp" />
     <ClCompile Include="LogUtils.cpp" />
     <ClCompile Include="SessionHost.cpp" />
@@ -183,6 +185,8 @@
     <ClInclude Include="DebugEvents.h" />
     <ClInclude Include="DebugProgram.h" />
     <ClInclude Include="DebugProgramNode.h" />
+    <ClInclude Include="DebugThread.h" />
+    <ClInclude Include="EnumDebugThreads.h" />
     <ClInclude Include="LogUtils.h" />
     <ClInclude Include="SessionHost.h" />
     <ClInclude Include="VSGDBDebugEngineGuids.h" />

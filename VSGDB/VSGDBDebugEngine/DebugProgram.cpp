@@ -1,4 +1,6 @@
 #include "DebugProgram.h"
+#include "DebugThread.h"
+#include "EnumDebugThreads.h"
 
 #include "LogUtils.h"
 #include "VSGDBDebugEngineGuids.h"
@@ -17,12 +19,21 @@ DebugProgram::DebugProgram(
         Process_->AddRef();
     }
 
+    MainThread_ = new (std::nothrow)
+        DebugThread(this, 0);
+
     VsgdbLog(L"DebugProgram created");
 }
 
 DebugProgram::~DebugProgram()
 {
     VsgdbLog(L"DebugProgram destroyed");
+
+    if (MainThread_ != nullptr)
+    {
+        MainThread_->Release();
+        MainThread_ = nullptr;
+    }
 
     if (Process_ != nullptr)
     {
@@ -86,10 +97,26 @@ DebugProgram::EnumThreads(
 
     *Enum = nullptr;
 
-    //
-    // No VSGDB-owned DebugThread yet.
-    //
-    return E_NOTIMPL;
+    std::vector<IDebugThread2*> Threads;
+
+    if (MainThread_ != nullptr)
+    {
+        Threads.push_back(
+            static_cast<IDebugThread2*>(MainThread_));
+    }
+
+    EnumDebugThreads* Enumerator =
+        new (std::nothrow) EnumDebugThreads(
+            Threads);
+
+    if (Enumerator == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    *Enum = Enumerator;
+
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE
