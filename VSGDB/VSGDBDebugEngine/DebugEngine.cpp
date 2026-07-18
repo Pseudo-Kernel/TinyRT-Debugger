@@ -536,22 +536,17 @@ DebugEngine::LaunchSuspended(
             return ProgramCreateHr;
         }
 
-#if 0
-        if (SUCCEEDED(ProgramHr) && Program_ != nullptr)
-        {
-            HRESULT ProgramCreateHr =
-                SendProgramCreateEvent();
+        HRESULT ThreadCreateHr =
+            SendThreadCreateEvent();
 
-            VsgdbLogFormat(
-                L"DebugEngine::LaunchSuspended: ProgramCreateEvent Hr=0x%08x",
-                ProgramCreateHr);
-        }
-        else
+        VsgdbLogFormat(
+            L"DebugEngine::LaunchSuspended: ThreadCreateEvent Hr=0x%08x",
+            ThreadCreateHr);
+
+        if (FAILED(ThreadCreateHr))
         {
-            VsgdbLog(
-                L"DebugEngine::LaunchSuspended: no Program_, skipping ProgramCreateEvent");
+            return ThreadCreateHr;
         }
-#endif
     }
     else
     {
@@ -872,6 +867,51 @@ DebugEngine::SendProgramCreateEvent()
 
     VsgdbLogFormat(
         L"DebugEngine::SendProgramCreateEvent: Hr=0x%08x",
+        Hr);
+
+    return Hr;
+}
+
+HRESULT
+DebugEngine::SendThreadCreateEvent()
+{
+    if (VsgdbProgram_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendThreadCreateEvent: VsgdbProgram_ is null");
+        return E_UNEXPECTED;
+    }
+
+    IDebugThread2* Thread =
+        VsgdbProgram_->GetMainThreadForEvent();
+
+    if (Thread == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendThreadCreateEvent: no main thread");
+        return E_UNEXPECTED;
+    }
+
+    DebugThreadCreateEvent* Event =
+        new (std::nothrow) DebugThreadCreateEvent();
+
+    if (Event == nullptr)
+    {
+        Thread->Release();
+        return E_OUTOFMEMORY;
+    }
+
+    HRESULT Hr =
+        SendEvent(
+            static_cast<IDebugEvent2*>(Event),
+            __uuidof(IDebugThreadCreateEvent2),
+            EVENT_ASYNCHRONOUS,
+            static_cast<IDebugProgram2*>(VsgdbProgram_),
+            Thread);
+
+    Event->Release();
+    Thread->Release();
+
+    VsgdbLogFormat(
+        L"DebugEngine::SendThreadCreateEvent: Hr=0x%08x",
         Hr);
 
     return Hr;

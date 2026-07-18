@@ -94,6 +94,8 @@ public:
         DUMPTYPE DumpType,
         LPCOLESTR DumpUrl) override;
 
+    IDebugThread2* GetMainThreadForEvent();
+
 private:
     ~DebugProgram();
 

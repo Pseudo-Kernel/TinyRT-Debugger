@@ -64,3 +64,30 @@ private:
 
     std::atomic<ULONG> ReferenceCount_ = 1;
 };
+
+class DebugThreadCreateEvent final :
+    public IDebugEvent2,
+    public IDebugThreadCreateEvent2
+{
+public:
+    DebugThreadCreateEvent();
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(
+        REFIID InterfaceId,
+        void** Object) override;
+
+    ULONG STDMETHODCALLTYPE AddRef() override;
+
+    ULONG STDMETHODCALLTYPE Release() override;
+
+    //
+    // IDebugEvent2
+    //
+    HRESULT STDMETHODCALLTYPE GetAttributes(
+        DWORD* EventAttributes) override;
+
+private:
+    ~DebugThreadCreateEvent();
+
+    std::atomic<ULONG> ReferenceCount_ = 1;
+};

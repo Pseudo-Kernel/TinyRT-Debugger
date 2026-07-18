@@ -112,6 +112,8 @@ private:
 
     HRESULT SendProgramCreateEvent();
 
+    HRESULT SendThreadCreateEvent();
+
     HRESULT CaptureProgramFromProcess(
         IDebugProcess2* Process);
 

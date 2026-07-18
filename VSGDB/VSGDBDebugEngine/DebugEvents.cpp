@@ -199,3 +199,86 @@ DebugProgramCreateEvent::GetAttributes(
 
     return S_OK;
 }
+
+
+
+
+// **************************************** //
+//          DebugThreadCreateEvent
+// **************************************** //
+
+
+DebugThreadCreateEvent::DebugThreadCreateEvent()
+{
+    VsgdbLog(L"DebugThreadCreateEvent created");
+}
+
+DebugThreadCreateEvent::~DebugThreadCreateEvent()
+{
+    VsgdbLog(L"DebugThreadCreateEvent destroyed");
+}
+
+HRESULT STDMETHODCALLTYPE
+DebugThreadCreateEvent::QueryInterface(
+    REFIID InterfaceId,
+    void** Object)
+{
+    if (Object == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    *Object = nullptr;
+
+    if (InterfaceId == __uuidof(IUnknown) ||
+        InterfaceId == __uuidof(IDebugEvent2))
+    {
+        *Object = static_cast<IDebugEvent2*>(this);
+        AddRef();
+        return S_OK;
+    }
+
+    if (InterfaceId == __uuidof(IDebugThreadCreateEvent2))
+    {
+        *Object = static_cast<IDebugThreadCreateEvent2*>(this);
+        AddRef();
+        return S_OK;
+    }
+
+    return E_NOINTERFACE;
+}
+
+ULONG STDMETHODCALLTYPE
+DebugThreadCreateEvent::AddRef()
+{
+    return ++ReferenceCount_;
+}
+
+ULONG STDMETHODCALLTYPE
+DebugThreadCreateEvent::Release()
+{
+    const ULONG Count = --ReferenceCount_;
+
+    if (Count == 0)
+    {
+        delete this;
+    }
+
+    return Count;
+}
+
+HRESULT STDMETHODCALLTYPE
+DebugThreadCreateEvent::GetAttributes(
+    DWORD* EventAttributes)
+{
+    VsgdbLog(L"DebugThreadCreateEvent::GetAttributes");
+
+    if (EventAttributes == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    *EventAttributes = EVENT_ASYNCHRONOUS;
+
+    return S_OK;
+}

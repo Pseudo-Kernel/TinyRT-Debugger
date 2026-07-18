@@ -422,3 +422,21 @@ DebugProgram::WriteDump(
 
     return E_NOTIMPL;
 }
+
+IDebugThread2*
+DebugProgram::GetMainThreadForEvent()
+{
+    VsgdbLog(L"DebugProgram::GetMainThreadForEvent");
+
+    if (MainThread_ == nullptr)
+    {
+        return nullptr;
+    }
+
+    IDebugThread2* Thread =
+        static_cast<IDebugThread2*>(MainThread_);
+
+    Thread->AddRef();
+
+    return Thread;
+}
