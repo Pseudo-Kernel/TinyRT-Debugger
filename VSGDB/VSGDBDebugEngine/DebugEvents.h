@@ -91,3 +91,27 @@ private:
 
     std::atomic<ULONG> ReferenceCount_ = 1;
 };
+
+class DebugLoadCompleteEvent final :
+    public IDebugEvent2,
+    public IDebugLoadCompleteEvent2
+{
+public:
+    DebugLoadCompleteEvent();
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(
+        REFIID InterfaceId,
+        void** Object) override;
+
+    ULONG STDMETHODCALLTYPE AddRef() override;
+
+    ULONG STDMETHODCALLTYPE Release() override;
+
+    HRESULT STDMETHODCALLTYPE GetAttributes(
+        DWORD* EventAttributes) override;
+
+private:
+    ~DebugLoadCompleteEvent();
+
+    std::atomic<ULONG> ReferenceCount_ = 1;
+};

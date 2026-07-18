@@ -114,12 +114,16 @@ private:
 
     HRESULT SendThreadCreateEvent();
 
+    HRESULT SendLoadCompleteEvent();
+
     HRESULT CaptureProgramFromProcess(
         IDebugProcess2* Process);
 
     void LogProgramInfo(
         IDebugProgram2* Program);
 
+    HRESULT AddProgramNodeToPortNotify(
+        IDebugProcess2* Process);
 
 private:
     std::atomic<ULONG> ReferenceCount_ = 1;
@@ -136,4 +140,6 @@ private:
 
 private:
     DebugProgram* VsgdbProgram_ = nullptr;
+    HANDLE ProgramCreateContinuedEvent_ = nullptr;
+
 };

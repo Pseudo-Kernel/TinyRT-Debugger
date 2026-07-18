@@ -2,6 +2,7 @@
 #include "DebugEngine.h"
 #include "DebugEvents.h"
 #include "DebugProgram.h"
+#include "DebugProgramNode.h"
 
 #include "LogUtils.h"
 #include "VSGDBDebugEngineGuids.h"
@@ -15,6 +16,13 @@
 DebugEngine::DebugEngine()
     : ReferenceCount_(1)
 {
+    ProgramCreateContinuedEvent_ =
+        CreateEventW(
+            nullptr,
+            TRUE,
+            FALSE,
+            nullptr);
+
     VsgdbLog(L"DebugEngine created");
 }
 
@@ -56,6 +64,12 @@ DebugEngine::~DebugEngine()
     {
         Program_->Release();
         Program_ = nullptr;
+    }
+
+    if (ProgramCreateContinuedEvent_ != nullptr)
+    {
+        CloseHandle(ProgramCreateContinuedEvent_);
+        ProgramCreateContinuedEvent_ = nullptr;
     }
 }
 
@@ -226,9 +240,34 @@ HRESULT STDMETHODCALLTYPE
 DebugEngine::ContinueFromSynchronousEvent(
     IDebugEvent2* Event)
 {
-    UNREFERENCED_PARAMETER(Event);
+    VsgdbLogFormat(
+        L"DebugEngine::ContinueFromSynchronousEvent: Event=%p",
+        Event);
 
-    VsgdbLog(L"DebugEngine::ContinueFromSynchronousEvent");
+    if (Event != nullptr)
+    {
+        IDebugProgramCreateEvent2* ProgramCreate = nullptr;
+
+        HRESULT Hr =
+            Event->QueryInterface(
+                __uuidof(IDebugProgramCreateEvent2),
+                reinterpret_cast<void**>(&ProgramCreate));
+
+        VsgdbLogFormat(
+            L"DebugEngine::ContinueFromSynchronousEvent: QI ProgramCreate Hr=0x%08x Ptr=%p",
+            Hr,
+            ProgramCreate);
+
+        if (ProgramCreate != nullptr)
+        {
+            ProgramCreate->Release();
+
+            if (ProgramCreateContinuedEvent_ != nullptr)
+            {
+                SetEvent(ProgramCreateContinuedEvent_);
+            }
+        }
+    }
 
     return S_OK;
 }
@@ -510,50 +549,11 @@ DebugEngine::LaunchSuspended(
         ProgramHr,
         Program_);
 
-    if (Callback_ != nullptr)
-    {
-        HRESULT EngineCreateHr =
-            SendEngineCreateEvent();
-
-        VsgdbLogFormat(
-            L"DebugEngine::LaunchSuspended: EngineCreateEvent Hr=0x%08x",
-            EngineCreateHr);
-
-        if (FAILED(EngineCreateHr))
-        {
-            return EngineCreateHr;
-        }
-
-        HRESULT ProgramCreateHr =
-            SendProgramCreateEvent();
-
-        VsgdbLogFormat(
-            L"DebugEngine::LaunchSuspended: ProgramCreateEvent Hr=0x%08x",
-            ProgramCreateHr);
-
-        if (FAILED(ProgramCreateHr))
-        {
-            return ProgramCreateHr;
-        }
-
-        HRESULT ThreadCreateHr =
-            SendThreadCreateEvent();
-
-        VsgdbLogFormat(
-            L"DebugEngine::LaunchSuspended: ThreadCreateEvent Hr=0x%08x",
-            ThreadCreateHr);
-
-        if (FAILED(ThreadCreateHr))
-        {
-            return ThreadCreateHr;
-        }
-    }
-    else
+    if (Callback_ == nullptr)
     {
         VsgdbLog(
             L"DebugEngine::LaunchSuspended: Callback is null, skipping EngineCreateEvent");
     }
-
 
     return S_OK;
 }
@@ -566,11 +566,81 @@ DebugEngine::ResumeProcess(
         L"DebugEngine::ResumeProcess: Process=%p",
         Process);
 
-    if (LaunchedThreadHandle_ == nullptr)
+    HRESULT Hr =
+        AddProgramNodeToPortNotify(Process);
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: AddProgramNodeToPortNotify Hr=0x%08x",
+        Hr);
+
+    if (ProgramCreateContinuedEvent_ != nullptr)
     {
-        VsgdbLog(L"DebugEngine::ResumeProcess: no suspended thread handle");
-        return S_OK;
+        ResetEvent(ProgramCreateContinuedEvent_);
     }
+
+    HRESULT EngineCreateHr =
+        SendEngineCreateEvent();
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: EngineCreateEvent Hr=0x%08x",
+        EngineCreateHr);
+
+    if (FAILED(EngineCreateHr))
+    {
+        return EngineCreateHr;
+    }
+
+    HRESULT ProgramCreateHr =
+        SendProgramCreateEvent();
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: ProgramCreateEvent Hr=0x%08x",
+        ProgramCreateHr);
+
+    if (FAILED(ProgramCreateHr))
+    {
+        return ProgramCreateHr;
+    }
+
+    HRESULT ThreadCreateHr =
+        SendThreadCreateEvent();
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: ThreadCreateEvent Hr=0x%08x",
+        ThreadCreateHr);
+
+    if (FAILED(ThreadCreateHr))
+    {
+        return ThreadCreateHr;
+    }
+
+    HRESULT LoadCompleteHr =
+        SendLoadCompleteEvent();
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: LoadCompleteEvent Hr=0x%08x",
+        LoadCompleteHr);
+
+    if (FAILED(LoadCompleteHr))
+    {
+        return LoadCompleteHr;
+    }
+
+    if (ProgramCreateContinuedEvent_ != nullptr)
+    {
+        DWORD WaitResult =
+            WaitForSingleObject(
+                ProgramCreateContinuedEvent_,
+                5000);
+
+        VsgdbLogFormat(
+            L"DebugEngine::ResumeProcess: ProgramCreate wait result=0x%08x",
+            WaitResult);
+    }
+
+    //
+    // Finally resume the Win32 anchor process.
+    //
 
     DWORD Result =
         ResumeThread(
@@ -859,7 +929,7 @@ DebugEngine::SendProgramCreateEvent()
         SendEvent(
             static_cast<IDebugEvent2*>(Event),
             __uuidof(IDebugProgramCreateEvent2),
-            EVENT_ASYNCHRONOUS,
+            EVENT_SYNCHRONOUS,
             static_cast<IDebugProgram2*>(VsgdbProgram_),
             nullptr);
 
@@ -913,6 +983,136 @@ DebugEngine::SendThreadCreateEvent()
     VsgdbLogFormat(
         L"DebugEngine::SendThreadCreateEvent: Hr=0x%08x",
         Hr);
+
+    return Hr;
+}
+
+HRESULT
+DebugEngine::SendLoadCompleteEvent()
+{
+    if (VsgdbProgram_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendLoadCompleteEvent: VsgdbProgram_ is null");
+        return E_UNEXPECTED;
+    }
+
+    IDebugThread2* Thread =
+        VsgdbProgram_->GetMainThreadForEvent();
+
+    if (Thread == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendLoadCompleteEvent: no main thread");
+        return E_UNEXPECTED;
+    }
+
+    DebugLoadCompleteEvent* Event =
+        new (std::nothrow) DebugLoadCompleteEvent();
+
+    if (Event == nullptr)
+    {
+        Thread->Release();
+        return E_OUTOFMEMORY;
+    }
+
+    HRESULT Hr =
+        SendEvent(
+            static_cast<IDebugEvent2*>(Event),
+            __uuidof(IDebugLoadCompleteEvent2),
+            EVENT_ASYNCHRONOUS,
+            static_cast<IDebugProgram2*>(VsgdbProgram_),
+            Thread);
+
+    Event->Release();
+    Thread->Release();
+
+    VsgdbLogFormat(
+        L"DebugEngine::SendLoadCompleteEvent: Hr=0x%08x",
+        Hr);
+
+    return Hr;
+}
+
+HRESULT
+DebugEngine::AddProgramNodeToPortNotify(
+    IDebugProcess2* Process)
+{
+    if (Process == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    IDebugPort2* Port = nullptr;
+
+    HRESULT Hr =
+        Process->GetPort(
+            &Port);
+
+    VsgdbLogFormat(
+        L"DebugEngine::AddProgramNodeToPortNotify: GetPort Hr=0x%08x Port=%p",
+        Hr,
+        Port);
+
+    if (FAILED(Hr) || Port == nullptr)
+    {
+        return Hr;
+    }
+
+    IDebugDefaultPort2* DefaultPort = nullptr;
+
+    Hr =
+        Port->QueryInterface(
+            __uuidof(IDebugDefaultPort2),
+            reinterpret_cast<void**>(&DefaultPort));
+
+    VsgdbLogFormat(
+        L"DebugEngine::AddProgramNodeToPortNotify: QI IDebugDefaultPort2 Hr=0x%08x Ptr=%p",
+        Hr,
+        DefaultPort);
+
+    Port->Release();
+
+    if (FAILED(Hr) || DefaultPort == nullptr)
+    {
+        return Hr;
+    }
+
+    IDebugPortNotify2* PortNotify = nullptr;
+
+    Hr =
+        DefaultPort->GetPortNotify(
+            &PortNotify);
+
+    VsgdbLogFormat(
+        L"DebugEngine::AddProgramNodeToPortNotify: GetPortNotify Hr=0x%08x Ptr=%p",
+        Hr,
+        PortNotify);
+
+    DefaultPort->Release();
+
+    if (FAILED(Hr) || PortNotify == nullptr)
+    {
+        return Hr;
+    }
+
+    DebugProgramNode* Node =
+        new (std::nothrow) DebugProgramNode();
+
+    if (Node == nullptr)
+    {
+        PortNotify->Release();
+        return E_OUTOFMEMORY;
+    }
+
+    Hr =
+        PortNotify->AddProgramNode(
+            static_cast<IDebugProgramNode2*>(Node));
+
+    VsgdbLogFormat(
+        L"DebugEngine::AddProgramNodeToPortNotify: AddProgramNode Hr=0x%08x",
+        Hr);
+
+    Node->Release();
+    PortNotify->Release();
 
     return Hr;
 }

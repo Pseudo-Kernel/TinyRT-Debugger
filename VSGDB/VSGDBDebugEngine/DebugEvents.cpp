@@ -195,7 +195,7 @@ DebugProgramCreateEvent::GetAttributes(
         return E_POINTER;
     }
 
-    *EventAttributes = EVENT_ASYNCHRONOUS;
+    *EventAttributes = EVENT_SYNCHRONOUS;
 
     return S_OK;
 }
@@ -272,6 +272,86 @@ DebugThreadCreateEvent::GetAttributes(
     DWORD* EventAttributes)
 {
     VsgdbLog(L"DebugThreadCreateEvent::GetAttributes");
+
+    if (EventAttributes == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    *EventAttributes = EVENT_ASYNCHRONOUS;
+
+    return S_OK;
+}
+
+
+// **************************************** //
+//          DebugLoadCompleteEvent
+// **************************************** //
+
+DebugLoadCompleteEvent::DebugLoadCompleteEvent()
+{
+    VsgdbLog(L"DebugLoadCompleteEvent created");
+}
+
+DebugLoadCompleteEvent::~DebugLoadCompleteEvent()
+{
+    VsgdbLog(L"DebugLoadCompleteEvent destroyed");
+}
+
+HRESULT STDMETHODCALLTYPE
+DebugLoadCompleteEvent::QueryInterface(
+    REFIID InterfaceId,
+    void** Object)
+{
+    if (Object == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    *Object = nullptr;
+
+    if (InterfaceId == __uuidof(IUnknown) ||
+        InterfaceId == __uuidof(IDebugEvent2))
+    {
+        *Object = static_cast<IDebugEvent2*>(this);
+        AddRef();
+        return S_OK;
+    }
+
+    if (InterfaceId == __uuidof(IDebugLoadCompleteEvent2))
+    {
+        *Object = static_cast<IDebugLoadCompleteEvent2*>(this);
+        AddRef();
+        return S_OK;
+    }
+
+    return E_NOINTERFACE;
+}
+
+ULONG STDMETHODCALLTYPE
+DebugLoadCompleteEvent::AddRef()
+{
+    return ++ReferenceCount_;
+}
+
+ULONG STDMETHODCALLTYPE
+DebugLoadCompleteEvent::Release()
+{
+    const ULONG Count = --ReferenceCount_;
+
+    if (Count == 0)
+    {
+        delete this;
+    }
+
+    return Count;
+}
+
+HRESULT STDMETHODCALLTYPE
+DebugLoadCompleteEvent::GetAttributes(
+    DWORD* EventAttributes)
+{
+    VsgdbLog(L"DebugLoadCompleteEvent::GetAttributes");
 
     if (EventAttributes == nullptr)
     {

@@ -165,7 +165,7 @@ DebugProgram::GetProcess(
 HRESULT STDMETHODCALLTYPE
 DebugProgram::Terminate()
 {
-    VsgdbLog(L"DebugProgram::Terminate");
+    VsgdbLog(L"DebugProgram::Terminate: handled by DebugEngine::TerminateProcess");
 
     return S_OK;
 }
@@ -186,7 +186,8 @@ DebugProgram::CanDetach()
 {
     VsgdbLog(L"DebugProgram::CanDetach");
 
-    return S_OK;
+    //return S_OK;
+    return S_FALSE;
 }
 
 HRESULT STDMETHODCALLTYPE
@@ -194,7 +195,8 @@ DebugProgram::Detach()
 {
     VsgdbLog(L"DebugProgram::Detach");
 
-    return S_OK;
+    //return S_OK;
+    return E_NOTIMPL;
 }
 
 HRESULT STDMETHODCALLTYPE
