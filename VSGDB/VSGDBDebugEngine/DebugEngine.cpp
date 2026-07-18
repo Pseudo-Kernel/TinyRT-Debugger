@@ -3,6 +3,7 @@
 #include "DebugEvents.h"
 #include "DebugProgram.h"
 #include "DebugProgramNode.h"
+#include "EnumDebugPrograms.h"
 
 #include "LogUtils.h"
 #include "VSGDBDebugEngineGuids.h"
@@ -30,6 +31,30 @@ DebugEngine::~DebugEngine()
 {
     VsgdbLog(L"DebugEngine destroyed");
 
+    if (VsgdbProgram_ != nullptr)
+    {
+        VsgdbProgram_->Release();
+        VsgdbProgram_ = nullptr;
+    }
+
+    if (Program_ != nullptr)
+    {
+        Program_->Release();
+        Program_ = nullptr;
+    }
+
+    if (Process_ != nullptr)
+    {
+        Process_->Release();
+        Process_ = nullptr;
+    }
+
+    if (Callback_ != nullptr)
+    {
+        Callback_->Release();
+        Callback_ = nullptr;
+    }
+
     if (LaunchedThreadHandle_ != nullptr)
     {
         CloseHandle(LaunchedThreadHandle_);
@@ -40,30 +65,6 @@ DebugEngine::~DebugEngine()
     {
         CloseHandle(LaunchedProcessHandle_);
         LaunchedProcessHandle_ = nullptr;
-    }
-
-    if (Callback_ != nullptr)
-    {
-        Callback_->Release();
-        Callback_ = nullptr;
-    }
-
-    if (VsgdbProgram_ != nullptr)
-    {
-        VsgdbProgram_->Release();
-        VsgdbProgram_ = nullptr;
-    }
-
-    if (Process_ != nullptr)
-    {
-        Process_->Release();
-        Process_ = nullptr;
-    }
-
-    if (Program_ != nullptr)
-    {
-        Program_->Release();
-        Program_ = nullptr;
     }
 
     if (ProgramCreateContinuedEvent_ != nullptr)
@@ -139,7 +140,26 @@ DebugEngine::EnumPrograms(
     }
 
     *Programs = nullptr;
-    return E_NOTIMPL;
+
+    std::vector<IDebugProgram2*> ProgramList;
+
+    if (VsgdbProgram_ != nullptr)
+    {
+        ProgramList.push_back(
+            static_cast<IDebugProgram2*>(VsgdbProgram_));
+    }
+
+    EnumDebugPrograms* Enum =
+        new (std::nothrow) EnumDebugPrograms(ProgramList);
+
+    if (Enum == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    *Programs = static_cast<IEnumDebugPrograms2*>(Enum);
+
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE
@@ -229,9 +249,38 @@ HRESULT STDMETHODCALLTYPE
 DebugEngine::DestroyProgram(
     IDebugProgram2* Program)
 {
-    UNREFERENCED_PARAMETER(Program);
+    VsgdbLogFormat(
+        L"DebugEngine::DestroyProgram: Program=%p VsgdbProgram_=%p",
+        Program,
+        VsgdbProgram_);
 
-    VsgdbLog(L"DebugEngine::DestroyProgram");
+    if (Program == nullptr)
+    {
+        return E_POINTER;
+    }
+
+    if (VsgdbProgram_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::DestroyProgram: no VSGDB program");
+        return S_OK;
+    }
+
+    IDebugProgram2* OwnedProgram =
+        static_cast<IDebugProgram2*>(VsgdbProgram_);
+
+    if (Program != OwnedProgram)
+    {
+        VsgdbLog(L"DebugEngine::DestroyProgram: ignoring non-VSGDB program");
+        return S_FALSE;
+    }
+
+    //
+    // The SDM is telling us that the VSGDB program is no longer needed.
+    // Drop the engine's ownership. Any outstanding COM references held by VS
+    // or event objects will keep the program alive until they are released.
+    //
+    VsgdbProgram_->Release();
+    VsgdbProgram_ = nullptr;
 
     return S_OK;
 }
