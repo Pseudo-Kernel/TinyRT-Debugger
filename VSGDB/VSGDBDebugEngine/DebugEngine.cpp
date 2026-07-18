@@ -24,6 +24,13 @@ DebugEngine::DebugEngine()
             FALSE,
             nullptr);
 
+    BreakContinuedEvent_ =
+        CreateEventW(
+            nullptr,
+            TRUE,
+            FALSE,
+            nullptr);
+
     VsgdbLog(L"DebugEngine created");
 }
 
@@ -71,6 +78,12 @@ DebugEngine::~DebugEngine()
     {
         CloseHandle(ProgramCreateContinuedEvent_);
         ProgramCreateContinuedEvent_ = nullptr;
+    }
+
+    if (BreakContinuedEvent_ != nullptr)
+    {
+        CloseHandle(BreakContinuedEvent_);
+        BreakContinuedEvent_ = nullptr;
     }
 }
 
@@ -293,29 +306,123 @@ DebugEngine::ContinueFromSynchronousEvent(
         L"DebugEngine::ContinueFromSynchronousEvent: Event=%p",
         Event);
 
-    if (Event != nullptr)
+    if (Event == nullptr)
     {
-        IDebugProgramCreateEvent2* ProgramCreate = nullptr;
+        return S_OK;
+    }
 
-        HRESULT Hr =
-            Event->QueryInterface(
-                __uuidof(IDebugProgramCreateEvent2),
-                reinterpret_cast<void**>(&ProgramCreate));
+    IDebugEngineCreateEvent2* EngineCreate = nullptr;
+    HRESULT Hr =
+        Event->QueryInterface(
+            __uuidof(IDebugEngineCreateEvent2),
+            reinterpret_cast<void**>(&EngineCreate));
 
-        VsgdbLogFormat(
-            L"DebugEngine::ContinueFromSynchronousEvent: QI ProgramCreate Hr=0x%08x Ptr=%p",
-            Hr,
-            ProgramCreate);
+    VsgdbLogFormat(
+        L"DebugEngine::ContinueFromSynchronousEvent: QI EngineCreate Hr=0x%08x Ptr=%p",
+        Hr,
+        EngineCreate);
 
-        if (ProgramCreate != nullptr)
+    if (EngineCreate != nullptr)
+    {
+        EngineCreate->Release();
+        return S_OK;
+    }
+
+    IDebugProgramCreateEvent2* ProgramCreate = nullptr;
+    Hr =
+        Event->QueryInterface(
+            __uuidof(IDebugProgramCreateEvent2),
+            reinterpret_cast<void**>(&ProgramCreate));
+
+    VsgdbLogFormat(
+        L"DebugEngine::ContinueFromSynchronousEvent: QI ProgramCreate Hr=0x%08x Ptr=%p",
+        Hr,
+        ProgramCreate);
+
+    if (ProgramCreate != nullptr)
+    {
+        ProgramCreate->Release();
+
+        if (ProgramCreateContinuedEvent_ != nullptr)
         {
-            ProgramCreate->Release();
-
-            if (ProgramCreateContinuedEvent_ != nullptr)
-            {
-                SetEvent(ProgramCreateContinuedEvent_);
-            }
+            SetEvent(ProgramCreateContinuedEvent_);
         }
+
+        return S_OK;
+    }
+
+    IDebugThreadCreateEvent2* ThreadCreate = nullptr;
+    Hr =
+        Event->QueryInterface(
+            __uuidof(IDebugThreadCreateEvent2),
+            reinterpret_cast<void**>(&ThreadCreate));
+
+    VsgdbLogFormat(
+        L"DebugEngine::ContinueFromSynchronousEvent: QI ThreadCreate Hr=0x%08x Ptr=%p",
+        Hr,
+        ThreadCreate);
+
+    if (ThreadCreate != nullptr)
+    {
+        ThreadCreate->Release();
+        return S_OK;
+    }
+
+    IDebugLoadCompleteEvent2* LoadComplete = nullptr;
+    Hr =
+        Event->QueryInterface(
+            __uuidof(IDebugLoadCompleteEvent2),
+            reinterpret_cast<void**>(&LoadComplete));
+
+    VsgdbLogFormat(
+        L"DebugEngine::ContinueFromSynchronousEvent: QI LoadComplete Hr=0x%08x Ptr=%p",
+        Hr,
+        LoadComplete);
+
+    if (LoadComplete != nullptr)
+    {
+        LoadComplete->Release();
+        return S_OK;
+    }
+
+    IDebugEntryPointEvent2* EntryPoint = nullptr;
+    Hr =
+        Event->QueryInterface(
+            __uuidof(IDebugEntryPointEvent2),
+            reinterpret_cast<void**>(&EntryPoint));
+
+    VsgdbLogFormat(
+        L"DebugEngine::ContinueFromSynchronousEvent: QI EntryPoint Hr=0x%08x Ptr=%p",
+        Hr,
+        EntryPoint);
+
+    if (EntryPoint != nullptr)
+    {
+        EntryPoint->Release();
+        return S_OK;
+    }
+
+    IDebugBreakEvent2* Break = nullptr;
+    Hr =
+        Event->QueryInterface(
+            __uuidof(IDebugBreakEvent2),
+            reinterpret_cast<void**>(&Break));
+
+    VsgdbLogFormat(
+        L"DebugEngine::ContinueFromSynchronousEvent: QI Break Hr=0x%08x Ptr=%p",
+        Hr,
+        Break);
+
+    if (Break != nullptr)
+    {
+        Break->Release();
+
+        if (BreakContinuedEvent_ != nullptr)
+        {
+            SetEvent(BreakContinuedEvent_);
+        }
+
+        return S_OK;
     }
 
     return S_OK;
@@ -675,6 +782,18 @@ DebugEngine::ResumeProcess(
         return LoadCompleteHr;
     }
 
+    HRESULT EntryPointHr =
+        SendEntryPointEvent();
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: EntryPointEvent Hr=0x%08x",
+        EntryPointHr);
+
+    if (FAILED(EntryPointHr))
+    {
+        return EntryPointHr;
+    }
+
     if (ProgramCreateContinuedEvent_ != nullptr)
     {
         DWORD WaitResult =
@@ -686,6 +805,20 @@ DebugEngine::ResumeProcess(
             L"DebugEngine::ResumeProcess: ProgramCreate wait result=0x%08x",
             WaitResult);
     }
+
+
+    HRESULT BreakHr =
+        SendBreakEvent();
+
+    VsgdbLogFormat(
+        L"DebugEngine::ResumeProcess: BreakEvent Hr=0x%08x",
+        BreakHr);
+
+    if (FAILED(BreakHr))
+    {
+        return BreakHr;
+    }
+
 
     //
     // Finally resume the Win32 anchor process.
@@ -944,7 +1077,7 @@ DebugEngine::SendEngineCreateEvent()
         SendEvent(
             static_cast<IDebugEvent2*>(Event),
             __uuidof(IDebugEngineCreateEvent2),
-            EVENT_ASYNCHRONOUS,
+            EVENT_SYNCHRONOUS,
             nullptr,
             nullptr);
 
@@ -1022,7 +1155,7 @@ DebugEngine::SendThreadCreateEvent()
         SendEvent(
             static_cast<IDebugEvent2*>(Event),
             __uuidof(IDebugThreadCreateEvent2),
-            EVENT_ASYNCHRONOUS,
+            EVENT_SYNCHRONOUS,
             static_cast<IDebugProgram2*>(VsgdbProgram_),
             Thread);
 
@@ -1067,7 +1200,7 @@ DebugEngine::SendLoadCompleteEvent()
         SendEvent(
             static_cast<IDebugEvent2*>(Event),
             __uuidof(IDebugLoadCompleteEvent2),
-            EVENT_ASYNCHRONOUS,
+            EVENT_SYNCHRONOUS,
             static_cast<IDebugProgram2*>(VsgdbProgram_),
             Thread);
 
@@ -1076,6 +1209,96 @@ DebugEngine::SendLoadCompleteEvent()
 
     VsgdbLogFormat(
         L"DebugEngine::SendLoadCompleteEvent: Hr=0x%08x",
+        Hr);
+
+    return Hr;
+}
+
+HRESULT
+DebugEngine::SendBreakEvent()
+{
+    if (VsgdbProgram_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendBreakEvent: VsgdbProgram_ is null");
+        return E_UNEXPECTED;
+    }
+
+    IDebugThread2* Thread =
+        VsgdbProgram_->GetMainThreadForEvent();
+
+    if (Thread == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendBreakEvent: no main thread");
+        return E_UNEXPECTED;
+    }
+
+    DebugBreakEvent* Event =
+        new (std::nothrow) DebugBreakEvent();
+
+    if (Event == nullptr)
+    {
+        Thread->Release();
+        return E_OUTOFMEMORY;
+    }
+
+    HRESULT Hr =
+        SendEvent(
+            static_cast<IDebugEvent2*>(Event),
+            __uuidof(IDebugBreakEvent2),
+            EVENT_SYNC_STOP,
+            static_cast<IDebugProgram2*>(VsgdbProgram_),
+            Thread);
+
+    Event->Release();
+    Thread->Release();
+
+    VsgdbLogFormat(
+        L"DebugEngine::SendBreakEvent: Hr=0x%08x",
+        Hr);
+
+    return Hr;
+}
+
+HRESULT
+DebugEngine::SendEntryPointEvent()
+{
+    if (VsgdbProgram_ == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendEntryPointEvent: VsgdbProgram_ is null");
+        return E_UNEXPECTED;
+    }
+
+    IDebugThread2* Thread =
+        VsgdbProgram_->GetMainThreadForEvent();
+
+    if (Thread == nullptr)
+    {
+        VsgdbLog(L"DebugEngine::SendEntryPointEvent: no main thread");
+        return E_UNEXPECTED;
+    }
+
+    DebugEntryPointEvent* Event =
+        new (std::nothrow) DebugEntryPointEvent();
+
+    if (Event == nullptr)
+    {
+        Thread->Release();
+        return E_OUTOFMEMORY;
+    }
+
+    HRESULT Hr =
+        SendEvent(
+            static_cast<IDebugEvent2*>(Event),
+            __uuidof(IDebugEntryPointEvent2),
+            EVENT_SYNCHRONOUS,
+            static_cast<IDebugProgram2*>(VsgdbProgram_),
+            Thread);
+
+    Event->Release();
+    Thread->Release();
+
+    VsgdbLogFormat(
+        L"DebugEngine::SendEntryPointEvent: Hr=0x%08x",
         Hr);
 
     return Hr;

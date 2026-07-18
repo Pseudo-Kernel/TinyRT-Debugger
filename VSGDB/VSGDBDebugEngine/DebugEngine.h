@@ -116,6 +116,10 @@ private:
 
     HRESULT SendLoadCompleteEvent();
 
+    HRESULT SendBreakEvent();
+
+    HRESULT SendEntryPointEvent();
+
     HRESULT CaptureProgramFromProcess(
         IDebugProcess2* Process);
 
@@ -141,5 +145,6 @@ private:
 private:
     DebugProgram* VsgdbProgram_ = nullptr;
     HANDLE ProgramCreateContinuedEvent_ = nullptr;
+    HANDLE BreakContinuedEvent_ = nullptr;
 
 };

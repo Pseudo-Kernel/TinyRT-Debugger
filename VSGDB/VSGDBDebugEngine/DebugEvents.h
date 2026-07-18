@@ -115,3 +115,51 @@ private:
 
     std::atomic<ULONG> ReferenceCount_ = 1;
 };
+
+class DebugBreakEvent final :
+    public IDebugEvent2,
+    public IDebugBreakEvent2
+{
+public:
+    DebugBreakEvent();
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(
+        REFIID InterfaceId,
+        void** Object) override;
+
+    ULONG STDMETHODCALLTYPE AddRef() override;
+
+    ULONG STDMETHODCALLTYPE Release() override;
+
+    HRESULT STDMETHODCALLTYPE GetAttributes(
+        DWORD* EventAttributes) override;
+
+private:
+    ~DebugBreakEvent();
+
+    std::atomic<ULONG> ReferenceCount_ = 1;
+};
+
+class DebugEntryPointEvent final :
+    public IDebugEvent2,
+    public IDebugEntryPointEvent2
+{
+public:
+    DebugEntryPointEvent();
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(
+        REFIID InterfaceId,
+        void** Object) override;
+
+    ULONG STDMETHODCALLTYPE AddRef() override;
+
+    ULONG STDMETHODCALLTYPE Release() override;
+
+    HRESULT STDMETHODCALLTYPE GetAttributes(
+        DWORD* EventAttributes) override;
+
+private:
+    ~DebugEntryPointEvent();
+
+    std::atomic<ULONG> ReferenceCount_ = 1;
+};
